@@ -344,27 +344,22 @@ for (let i = 0; i < lines.length; i++) {
             const lines = text.split('\n').map(l => l.trim());
             let stats = { ppPct: 0, pkPct: 0, gpg: 0, gapg: 0 };
             
-            // Try to find the stats line - looking for format: W L T GPG GAPG PP PP% PK PPGA PK%
+            // Look for the line with team stats - format: Delano 27 4.00 3.15 89 25.8 85 23 72.9
+            // We need: GPG (index 2), GAPG (index 3), PP% (index 5), PK% (index 8)
             for (let i = 0; i < lines.length; i++) {
               const parts = lines[i].split(/\s+/);
               
-              // Format 1: Full stats line with at least 10 fields
-              if (parts.length >= 10 && parts[0].match(/\d+/)) {
-                stats.gpg = parseFloat(parts[3]) || 0;
-                stats.gapg = parseFloat(parts[4]) || 0;
-                stats.ppPct = parseFloat(parts[6]) || 0;
-                stats.pkPct = parseFloat(parts[9]) || 0;
-                console.log('Found stats (format 1):', stats);
-                break;
-              }
-              
-              // Format 2: Alternative format with decimals
-              if (parts.length >= 8 && parts[1]?.match(/\d+\.\d+/)) {
-                stats.gpg = parseFloat(parts[1]) || 0;
-                stats.gapg = parseFloat(parts[2]) || 0;
-                stats.ppPct = parseFloat(parts[4]) || 0;
-                stats.pkPct = parseFloat(parts[7]) || 0;
-                console.log('Found stats (format 2):', stats);
+              // Look for line starting with team name and has 9+ fields with the right pattern
+              if (parts.length >= 9 && 
+                  (parts[0] === 'Delano' || parts[0].includes('Tigers') || /^\d+$/.test(parts[1])) &&
+                  parts[2]?.match(/^\d+\.\d+$/) && 
+                  parts[3]?.match(/^\d+\.\d+$/)) {
+                stats.gpg = parseFloat(parts[2]) || 0;
+                stats.gapg = parseFloat(parts[3]) || 0;
+                stats.ppPct = parseFloat(parts[5]) || 0;
+                stats.pkPct = parseFloat(parts[8]) || 0;
+                console.log('Found stats at line:', lines[i]);
+                console.log('Parsed stats:', stats);
                 break;
               }
             }
