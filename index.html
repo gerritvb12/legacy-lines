@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hockey Scout Sheet</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const Upload = ({ size = 16 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+            </svg>
+        );
+        
+        const Settings = ({ size = 16 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m5.2-13.8l-1 1.7m-4.4 7.6l-1 1.7M23 12h-6m-6 0H5m13.8 5.2l-1.7-1m-7.6-4.4l-1.7-1"/>
+            </svg>
+        );
+        
+        const Printer = ({ size = 16 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+            </svg>
+        );
+
+        const X = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        );
+
+        const HockeyLinesChart = () => {
+          const [myTeamSetup, setMyTeamSetup] = useState({
+            teamName: 'Delano Tigers',
+            logo: null,
+            colors: { primary: '#fb923c', secondary: '#1f2937' },
+            arena: 'Delano Area Sports Arena, Delano',
+            careerStats: {},
+            pronunciations: {}
+          });
+
+          const [myTeamData, setMyTeamData] = useState({
+            record: { w: 0, l: 0, t: 0 },
+            section: '2A',
+            conference: 'WCC',
+            stats: { ppPct: 0, pkPct: 0, gpg: 0, gapg: 0 },
+            roster: [],
+            nextGame: { gameNum: '', opponent: '', date: '', location: '', oppRecord: '', oppSection: '', oppConference: '' },
+            headCoach: { name: '', careerRecord: { w: 0, l: 0, t: 0 } },
+            studentManager: '',
+            injuries: []
+          });
+
+          const [opponentData, setOpponentData] = useState({
+            teamName: '',
+            record: { w: 0, l: 0, t: 0 },
+            section: '',
+            conference: '',
+            stats: { ppPct: 0, pkPct: 0, gpg: 0, gapg: 0 },
+            roster: []
+          });
+
+          const [lines, setLines] = useState({
+            line1: { lw: null, c: null, rw: null, color: 'GREEN' },
+            line2: { lw: null, c: null, rw: null, color: 'RED' },
+            line3: { lw: null, c: null, rw: null, color: 'BLUE' },
+            line4: { lw: null, c: null, rw: null, color: 'YELLOW' },
+            d1: { ld: null, rd: null },
+            d2: { ld: null, rd: null },
+            d3: { ld: null, rd: null },
+            goalies: { starter: null, backup: null }
+          });
+
+          const [coachNotes, setCoachNotes] = useState({
+            pk: '',
+            pp: '',
+            scoutNotes: { powerPlay: '', penaltyKill: '', keyPlayers: '' },
+            showScoutNotes: true
+          });
+
+          const [showSetup, setShowSetup] = useState(false);
+          const [showImport, setShowImport] = useState(false);
+          const [showColorPicker, setShowColorPicker] = useState(false);
+          const [importStep, setImportStep] = useState('myTeamHome');
+          const [importText, setImportText] = useState('');
+          const [draggedPlayer, setDraggedPlayer] = useState(null);
+          const [dragSource, setDragSource] = useState(null);
+          const [opponentLogo, setOpponentLogo] = useState(null);
+          const [opponentColors, setOpponentColors] = useState({ primary: '#dc2626', secondary: '#991b1b' });
+          const [careerStatsImport, setCareerStatsImport] = useState({
+            lastSeason: '',
+            twoSeasonsAgo: '',
+            threeSeasonsAgo: ''
+          });
+
+          const colorOptions = ['GREEN', 'RED', 'BLUE', 'YELLOW'];
+          const colorClasses = {
+            'GREEN': 'bg-green-100 border-green-600',
+            'RED': 'bg-red-100 border-red-600',
+            'BLUE': 'bg-blue-100 border-blue-600',
+            'YELLOW': 'bg-yellow-100 border-yellow-600'
+          };
+
+          const importSteps = [
+            { key: 'myTeamHome', label: 'My Team - Legacy Home', team: 'mine' },
+            { key: 'myTeamRoster', label: 'My Team - Legacy Roster', team: 'mine' },
+            { key: 'myTeamSchedule', label: 'My Team - Legacy Game Schedule', team: 'mine' },
+            { key: 'myTeamPlayerStats', label: 'My Team - Legacy Player Stats', team: 'mine' },
+            { key: 'myTeamTeamStats', label: 'My Team - Legacy Team Stats', team: 'mine' },
+            { key: 'oppLogo', label: 'Opponent - Logo', team: 'opponent', isLogo: true },
+            { key: 'oppHome', label: 'Opponent - Legacy Home', team: 'opponent' },
+            { key: 'oppRoster', label: 'Opponent - Legacy Roster', team: 'opponent' },
+            { key: 'oppPlayerStats', label: 'Opponent - Legacy Player Stats', team: 'opponent' },
+            { key: 'oppTeamStats', label: 'Opponent - Legacy Team Stats', team: 'opponent' }
+          ];
+
+          useEffect(() => {
+            const saved = localStorage.getItem('myTeamSetup');
+            if (saved) {
+              setMyTeamSetup(JSON.parse(saved));
+            }
+          }, []);
+
+          useEffect(() => {
+            localStorage.setItem('myTeamSetup', JSON.stringify(myTeamSetup));
+          }, [myTeamSetup]);
+
+          const parseHomePage = (text) => {
+            const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+            let teamName = '';
+            let record = { w: 0, l: 0, t: 0 };
+            let section = '';
+            let conference = '';
+            let headCoach = { name: '', careerRecord: { w: 0, l: 0, t: 0 } };
+            
+            const teamIdx = lines.findIndex(l => l.includes('Tigers') || l.includes('Delano'));
+            if (teamIdx >= 0) teamName = lines[teamIdx];
+            
+            for (let i = 0; i < lines.length; i++) {
+              const match = lines[i].match(/(\d+)\s+(\d+)\s+(\d+)/);
+              if (match && lines[i].includes('W') && lines[i].includes('L')) {
+                const nextLine = lines[i + 1]?.split(/\s+/);
+                if (nextLine && nextLine.length >= 3) {
+                  record = { w: parseInt(nextLine[0]), l: parseInt(nextLine[1]), t: parseInt(nextLine[2]) };
+                }
+                break;
+              }
+            }
+            
+            const coachIdx = lines.findIndex(l => l.includes('Head Coach'));
+            if (coachIdx >= 0 && coachIdx + 1 < lines.length) {
+              headCoach.name = lines[coachIdx + 1];
+              const recordMatch = lines[coachIdx + 2]?.match(/(\d+)-(\d+)-(\d+)/);
+              if (recordMatch) {
+                headCoach.careerRecord = { 
+                  w: parseInt(recordMatch[1]), 
+                  l: parseInt(recordMatch[2]), 
+                  t: parseInt(recordMatch[3]) 
+                };
+              }
+            }
+            
+            const sectionIdx = lines.findIndex(l => l.includes('Section:'));
+            if (sectionIdx >= 0) section = lines[sectionIdx].split(':')[1]?.trim() || '';
+            
+            const confIdx = lines.findIndex(l => l.includes('Conference:'));
+            if (confIdx >= 0) conference = lines[confIdx].split(':')[1]?.trim() || '';
+            
+            let stats = { ppPct: 0, pkPct: 0, gpg: 0, gapg: 0 };
+            for (let i = 0; i < lines.length; i++) {
+              const parts = lines[i].split(/\s+/);
+              if (parts.length >= 10 && parts[0].match(/\d+/)) {
+                stats.gpg = parseFloat(parts[3]) || 0;
+                stats.gapg = parseFloat(parts[4]) || 0;
+                stats.ppPct = parseFloat(parts[6]) || 0;
+                stats.pkPct = parseFloat(parts[9]) || 0;
+                break;
+              }
+            }
+            
+            return { teamName, record, section, conference, headCoach, stats };
+          };
+
+          const parseRoster = (text) => {
+            const lines = text.split('\n').map(l => l.trim());
+            const roster = [];
+            
+            for (let i = 0; i < lines.length; i++) {
+              const line = lines[i];
+              if (!line || line.includes('Printable')) break;
+              
+              const match = line.match(/^(\d+)([A-Za-z\s]+)(G|F|D)(\d{1,2})([\d'"\s-]+)(\d{3})(Right|Left|Catches Left|Catches Right)/);
+              if (match) {
+                const name = match[2].trim();
+                const lastName = name.split(' ').pop();
+                const firstName = name.split(' ').slice(0, -1).join(' ');
+                
+                roster.push({
+                  id: Date.now() + i,
+                  number: match[1],
+                  firstName: firstName.toUpperCase(),
+                  lastName: lastName.toUpperCase(),
+                  position: match[3],
+                  grade: match[4],
+                  height: match[5].trim(),
+                  weight: match[6],
+                  shoots: match[7].includes('Left') ? 'Left' : 'Right',
+                  catches: match[3] === 'G' ? (match[7].includes('Left') ? 'Left' : 'Right') : null,
+                  pronunciation: myTeamSetup.pronunciations[lastName] || '',
+                  stats: { gp: 0, g: 0, a: 0, pts: 0, pim: 0, plusMinus: 0, fow: 0, fol: 0, ppg: 0, ppa: 0, sh: 0, sha: 0 },
+                  goalieStats: match[3] === 'G' ? { gp: 0, min: '000:00', w: 0, l: 0, t: 0, sog: 0, sv: 0, ga: 0, gaa: 0, svp: '.000', so: 0 } : null,
+                  careerStats: myTeamSetup.careerStats[name] || { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0 }
+                });
+              }
+            }
+            
+            return roster;
+          };
+
+          const parseSchedule = (text) => {
+            const lines = text.split('\n').map(l => l.trim());
+            let gameNum = '', opponent = '', date = '', location = '', oppRecord = '', oppSection = '', oppConference = '';
+            
+            for (let i = 0; i < lines.length; i++) {
+              if (lines[i].match(/Game #\d+/)) {
+                gameNum = lines[i].match(/\d+/)[0];
+              }
+              if (lines[i].includes('vs ')) {
+                opponent = lines[i].split('vs ')[1].split('(')[0].trim();
+                const recordMatch = lines[i].match(/\((\d+-\d+-\d+)/);
+                if (recordMatch) oppRecord = recordMatch[1];
+              }
+            }
+            
+            return { gameNum, opponent, date, location, oppRecord, oppSection, oppConference };
+          };
+
+          const parsePlayerStats = (text, existingRoster) => {
+            const lines = text.split('\n').map(l => l.trim());
+            const updatedRoster = [...existingRoster];
+            
+            for (let i = 0; i < lines.length; i++) {
+              const parts = lines[i].split(/\s+/);
+              
+              if (parts.length > 15 && /^\d+$/.test(parts[0])) {
+                const number = parts[0];
+                const player = updatedRoster.find(p => p.number === number && p.position !== 'G');
+                
+                if (player) {
+                  player.stats = {
+                    gp: parseInt(parts[2]) || 0,
+                    g: parseInt(parts[3]) || 0,
+                    a: parseInt(parts[4]) || 0,
+                    pts: parseInt(parts[5]) || 0,
+                    pim: parseInt(parts[11]) || 0,
+                    plusMinus: parseInt(parts[18]) || 0,
+                    fow: parseInt(parts[12]) || 0,
+                    fol: parseInt(parts[13]) || 0,
+                    ppg: parseInt(parts[7]) || 0,
+                    ppa: parseInt(parts[8]) || 0,
+                    sh: parseInt(parts[9]) || 0,
+                    sha: parseInt(parts[10]) || 0
+                  };
+                }
+              }
+              
+              if (parts.length > 9 && /^\d+$/.test(parts[0]) && parts[1].includes(':')) {
+                const number = parts[0];
+                const player = updatedRoster.find(p => p.number === number && p.position === 'G');
+                
+                if (player && player.goalieStats) {
+                  player.goalieStats = {
+                    gp: parseInt(parts[1]) || 0,
+                    min: parts[2] || '000:00',
+                    w: parseInt(parts[3]) || 0,
+                    l: parseInt(parts[4]) || 0,
+                    t: parseInt(parts[5]) || 0,
+                    sog: parseInt(parts[6]) || 0,
+                    sv: parseInt(parts[7]) || 0,
+                    ga: parseInt(parts[8]) || 0,
+                    gaa: parseFloat(parts[9]) || 0,
+                    svp: parts[10] || '.000',
+                    so: parseInt(parts[11]) || 0
+                  };
+                }
+              }
+            }
+            
+            return updatedRoster;
+          };
+
+          const parseTeamStats = (text) => {
+            const lines = text.split('\n').map(l => l.trim());
+            let stats = { ppPct: 0, pkPct: 0, gpg: 0, gapg: 0 };
+            
+            for (let i = 0; i < lines.length; i++) {
+              const parts = lines[i].split(/\s+/);
+              if (parts.length >= 8 && parts[1].match(/\d+\.\d+/)) {
+                stats.gpg = parseFloat(parts[1]) || 0;
+                stats.gapg = parseFloat(parts[2]) || 0;
+                stats.ppPct = parseFloat(parts[4]) || 0;
+                stats.pkPct = parseFloat(parts[7]) || 0;
+                break;
+              }
+            }
+            
+            return stats;
+          };
+
+          const handleLogoPaste = async (isSetup, isMyTeam) => {
+            try {
+              const clipboardItems = await navigator.clipboard.read();
+              for (const item of clipboardItems) {
+                for (const type of item.types) {
+                  if (type.startsWith('image/')) {
+                    const blob = await item.getType(type);
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      const logoUrl = event.target.result;
+                      
+                      if (isSetup) {
+                        setMyTeamSetup(prev => ({ ...prev, logo: logoUrl }));
+                      } else if (isMyTeam) {
+                        setMyTeamSetup(prev => ({ ...prev, logo: logoUrl }));
+                      } else {
+                        setOpponentLogo(logoUrl);
+                      }
+                    };
+                    reader.readAsDataURL(blob);
+                    return;
+                  }
+                }
+              }
+              alert('No image found in clipboard.');
+            } catch (err) {
+              alert('Unable to paste. Please use Choose File or copy an image first.');
+            }
+          };
+
+          const handleLogoUpload = (e, isSetup, isMyTeam) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              const logoUrl = event.target.result;
+              
+              if (isSetup) {
+                setMyTeamSetup(prev => ({ ...prev, logo: logoUrl }));
+              } else if (isMyTeam) {
+                setMyTeamSetup(prev => ({ ...prev, logo: logoUrl }));
+              } else {
+                setOpponentLogo(logoUrl);
+              }
+            };
+            reader.readAsDataURL(file);
+          };
+
+          const handleImport = () => {
+            const text = importText;
+            
+            if (importStep === 'oppLogo') {
+              const currentIdx = importSteps.findIndex(s => s.key === importStep);
+              if (currentIdx < importSteps.length - 1) {
+                setImportStep(importSteps[currentIdx + 1].key);
+              }
+              return;
+            }
+            
+            if (importStep === 'myTeamHome') {
+              const parsed = parseHomePage(text);
+              setMyTeamData(prev => ({ ...prev, ...parsed }));
+            } else if (importStep === 'myTeamRoster') {
+              const roster = parseRoster(text);
+              setMyTeamData(prev => ({ ...prev, roster }));
+            } else if (importStep === 'myTeamSchedule') {
+              const nextGame = parseSchedule(text);
+              setMyTeamData(prev => ({ ...prev, nextGame }));
+            } else if (importStep === 'myTeamPlayerStats') {
+              const updatedRoster = parsePlayerStats(text, myTeamData.roster);
+              setMyTeamData(prev => ({ ...prev, roster: updatedRoster }));
+            } else if (importStep === 'myTeamTeamStats') {
+              const stats = parseTeamStats(text);
+              setMyTeamData(prev => ({ ...prev, stats }));
+            } else if (importStep === 'oppHome') {
+              const parsed = parseHomePage(text);
+              setOpponentData(prev => ({ ...prev, ...parsed }));
+            } else if (importStep === 'oppRoster') {
+              const roster = parseRoster(text);
+              setOpponentData(prev => ({ ...prev, roster }));
+            } else if (importStep === 'oppPlayerStats') {
+              const updatedRoster = parsePlayerStats(text, opponentData.roster);
+              setOpponentData(prev => ({ ...prev, roster: updatedRoster }));
+            } else if (importStep === 'oppTeamStats') {
+              const stats = parseTeamStats(text);
+              setOpponentData(prev => ({ ...prev, stats }));
+            }
+            
+            setImportText('');
+            
+            const currentIdx = importSteps.findIndex(s => s.key === importStep);
+            if (currentIdx < importSteps.length - 1) {
+              setImportStep(importSteps[currentIdx + 1].key);
+            } else {
+              setShowImport(false);
+            }
+          };
+
+          const handleSkipStep = () => {
+            setImportText('');
+            const currentIdx = importSteps.findIndex(s => s.key === importStep);
+            if (currentIdx < importSteps.length - 1) {
+              setImportStep(importSteps[currentIdx + 1].key);
+            } else {
+              setShowImport(false);
+            }
+          };
+
+          const handleDragStart = (player, source) => {
+            setDraggedPlayer(player);
+            setDragSource(source);
+          };
+
+          const handleDrop = (line, position) => {
+            if (!draggedPlayer) return;
+
+            const newLines = { ...lines };
+            
+            if (dragSource && dragSource.line) {
+              newLines[dragSource.line][dragSource.position] = null;
+            }
+
+            const existingPlayer = newLines[line][position];
+            newLines[line][position] = draggedPlayer;
+
+            if (existingPlayer && dragSource && dragSource.line) {
+              newLines[dragSource.line][dragSource.position] = existingPlayer;
+            }
+
+            setLines(newLines);
+            setDraggedPlayer(null);
+            setDragSource(null);
+          };
+
+          const handleLineColorChange = (line, color) => {
+            setLines({ ...lines, [line]: { ...lines[line], color } });
+          };
+
+          const PlayerCard = ({ player, source, compact = false }) => {
+            if (!player) return null;
+            
+            const isGoalie = player.position === 'G';
+            const faceoffPct = player.stats.fow + player.stats.fol > 0 
+              ? ((player.stats.fow / (player.stats.fow + player.stats.fol)) * 100).toFixed(1)
+              : '0.0';
+            
+            return (
+              <div
+                draggable={true}
+                onDragStart={() => handleDragStart(player, source)}
+                className="bg-white border-2 border-gray-800 rounded p-2 cursor-move hover:shadow-xl transition-all"
+                style={{ minWidth: compact ? '140px' : '180px', fontSize: '11px' }}
+              >
+                <div className="flex gap-2">
+                  <div className="text-4xl font-black" style={{ lineHeight: '1' }}>{player.number}</div>
+                  <div className="flex-1">
+                    <div className="font-bold text-sm leading-tight">{player.firstName}</div>
+                    <div className="font-bold text-lg leading-tight">{player.lastName}</div>
+                    <div className="text-xs mt-1">
+                      <div className="flex justify-between">
+                        <span>{player.shoots}</span>
+                        <span>{player.grade}th</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>{player.stats.pim} PIM</span>
+                        <span>+/- ({player.stats.plusMinus})</span>
+                      </div>
+                      {!compact && !isGoalie && (
+                        <>
+                          <div className="font-semibold">25-26: {player.stats.gp}GP, {player.stats.g}-{player.stats.a}--{player.stats.pts}</div>
+                          {player.pronunciation && (
+                            <div className="italic">"{player.pronunciation}"</div>
+                          )}
+                          {player.stats.fow + player.stats.fol > 0 && (
+                            <div>Faceoffs: {faceoffPct}%</div>
+                          )}
+                          {player.careerStats.gp > 0 && (
+                            <div className="text-xs bg-blue-50 px-1 rounded mt-1">
+                              Career: {player.careerStats.gp}GP {player.careerStats.g}-{player.careerStats.a}--{player.careerStats.pts}
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {!compact && isGoalie && player.goalieStats && (
+                        <>
+                          <div className="font-semibold">{player.goalieStats.w}-{player.goalieStats.l}-{player.goalieStats.t} ({player.goalieStats.gp})</div>
+                          <div>GAA {player.goalieStats.gaa.toFixed(2)}</div>
+                          {player.pronunciation && (
+                            <div className="italic">"{player.pronunciation}"</div>
+                          )}
+                          <div>SV {player.goalieStats.svp}</div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          };
+
+          const LineSlot = ({ line, position, label }) => {
+            const player = lines[line][position];
+            
+            return (
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => handleDrop(line, position)}
+                className="relative"
+              >
+                <div className="text-xs font-bold text-center mb-1">{label}</div>
+                <div className={`border-2 border-dashed rounded p-2 min-h-[120px] flex items-center justify-center ${
+                  player ? 'border-gray-400 bg-gray-50' : 'border-gray-300 bg-white'
+                }`}>
+                  {player ? (
+                    <PlayerCard player={player} source={{ line, position }} compact={true} />
+                  ) : (
+                    <div className="text-gray-400 text-xs">Drop</div>
+                  )}
+                </div>
+              </div>
+            );
+          };
+
+          const getPlayersInLines = () => {
+            const playersInLines = new Set();
+            Object.values(lines).forEach(line => {
+              Object.values(line).forEach(val => {
+                if (val && typeof val === 'object' && val.id) {
+                  playersInLines.add(val.id);
+                }
+              });
+            });
+            return playersInLines;
+          };
+
+          const availablePlayers = myTeamData.roster.filter(p => !getPlayersInLines().has(p.id));
+          const currentStepInfo = importSteps.find(s => s.key === importStep);
+          const totalCoachRecord = {
+            w: myTeamData.headCoach.careerRecord.w + myTeamData.record.w,
+            l: myTeamData.headCoach.careerRecord.l + myTeamData.record.l,
+            t: myTeamData.headCoach.careerRecord.t + myTeamData.record.t
+          };
+
+          return (
+            <div className="min-h-screen bg-gray-50">
+              {showSetup && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                    <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
+                      <h2 className="text-xl font-bold">My Team Setup</h2>
+                      <button onClick={() => setShowSetup(false)} className="text-gray-500 hover:text-gray-700">
+                        <X size={24} />
+                      </button>
+                    </div>
+                    
+                    <div className="p-6 space-y-4">
+                      <div>
+                        <label className="block text-sm font-semibold mb-1">Team Name</label>
+                        <input
+                          type="text"
+                          value={myTeamSetup.teamName}
+                          onChange={(e) => setMyTeamSetup({...myTeamSetup, teamName: e.target.value})}
+                          className="w-full border rounded px-3 py-2"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-semibold mb-1">Arena</label>
+                        <input
+                          type="text"
+                          value={myTeamSetup.arena}
+                          onChange={(e) => setMyTeamSetup({...myTeamSetup, arena: e.target.value})}
+                          className="w-full border rounded px-3 py-2"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-semibold mb-2">Team Logo</label>
+                        <div className="flex gap-2 items-center">
+                          {myTeamSetup.logo && (
+                            <img src={myTeamSetup.logo} alt="Logo" className="h-16 w-16 object-contain border rounded" />
+                          )}
+                          <div className="flex-1">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleLogoUpload(e, true, true)}
+                              className="text-sm"
+                            />
+                            <button
+                              onClick={() => handleLogoPaste(true, true)}
+                              className="mt-2 bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
+                            >
+                              Paste from Clipboard
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold mb-1">Primary Color</label>
+                          <input
+                            type="color"
+                            value={myTeamSetup.colors.primary}
+                            onChange={(e) => setMyTeamSetup({...myTeamSetup, colors: {...myTeamSetup.colors, primary: e.target.value}})}
+                            className="w-full h-10 border rounded cursor-pointer"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold mb-1">Secondary Color</label>
+                          <input
+                            type="color"
+                            value={myTeamSetup.colors.secondary}
+                            onChange={(e) => setMyTeamSetup({...myTeamSetup, colors: {...myTeamSetup.colors, secondary: e.target.value}})}
+                            className="w-full h-10 border rounded cursor-pointer"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="border-t px-6 py-4 flex justify-end">
+                      <button
+                        onClick={() => setShowSetup(false)}
+                        className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
+                      >
+                        Save & Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {showImport && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+                    <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
+                      <div>
+                        <h2 className="text-xl font-bold">Import Data</h2>
+                        <p className="text-sm text-gray-600 mt-1">{currentStepInfo?.label}</p>
+                      </div>
+                      <button onClick={() => setShowImport(false)} className="text-gray-500 hover:text-gray-700">
+                        <X size={24} />
+                      </button>
+                    </div>
+                    
+                    <div className="p-6">
+                      <div className="mb-4 flex gap-1 flex-wrap">
+                        {importSteps.map((step, idx) => (
+                          <div
+                            key={step.key}
+                            className={`text-xs px-2 py-1 rounded ${
+                              step.key === importStep 
+                                ? 'bg-blue-600 text-white' 
+                                : 'bg-gray-200 text-gray-600'
+                            }`}
+                          >
+                            {idx + 1}. {step.label}
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {currentStepInfo?.isLogo ? (
+                        <div className="space-y-4">
+                          <p className="text-sm">Upload or paste the opponent's logo</p>
+                          <div className="flex gap-2 items-center">
+                            {opponentLogo && (
+                              <img src={opponentLogo} alt="Opponent Logo" className="h-20 w-20 object-contain border rounded" />
+                            )}
+                            <div>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => handleLogoUpload(e, false, false)}
+                                className="text-sm mb-2"
+                              />
+                              <button
+                                onClick={() => handleLogoPaste(false, false)}
+                                className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 block"
+                              >
+                                Paste from Clipboard
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="block text-sm font-semibold mb-2">
+                            Paste content from {currentStepInfo?.label}
+                          </label>
+                          <textarea
+                            value={importText}
+                            onChange={(e) => setImportText(e.target.value)}
+                            placeholder="Paste text here..."
+                            className="w-full border rounded px-3 py-2 font-mono text-xs"
+                            rows="12"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="border-t px-6 py-4 flex justify-between">
+                      <button
+                        onClick={handleSkipStep}
+                        className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+                      >
+                        Skip Step
+                      </button>
+                      <button
+                        onClick={handleImport}
+                        className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
+                      >
+                        {importSteps.findIndex(s => s.key === importStep) === importSteps.length - 1 ? 'Finish' : 'Next Step'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {showColorPicker && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+                    <div className="border-b px-6 py-4 flex justify-between items-center">
+                      <h2 className="text-xl font-bold">Opponent Colors</h2>
+                      <button onClick={() => setShowColorPicker(false)} className="text-gray-500 hover:text-gray-700">
+                        <X size={24} />
+                      </button>
+                    </div>
+                    
+                    <div className="p-6 space-y-4">
+                      <div>
+                        <label className="block text-sm font-semibold mb-1">Primary Color</label>
+                        <input
+                          type="color"
+                          value={opponentColors.primary}
+                          onChange={(e) => setOpponentColors({...opponentColors, primary: e.target.value})}
+                          className="w-full h-12 border rounded cursor-pointer"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold mb-1">Secondary Color</label>
+                        <input
+                          type="color"
+                          value={opponentColors.secondary}
+                          onChange={(e) => setOpponentColors({...opponentColors, secondary: e.target.value})}
+                          className="w-full h-12 border rounded cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="border-t px-6 py-4 flex justify-end">
+                      <button
+                        onClick={() => setShowColorPicker(false)}
+                        className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="no-print bg-gradient-to-r from-blue-900 to-blue-700 text-white p-3 shadow-lg sticky top-0 z-50">
+                <div className="max-w-7xl mx-auto flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    {myTeamSetup.logo && (
+                      <img src={myTeamSetup.logo} alt="Team" className="h-10 w-10 object-contain bg-white rounded-full p-1" />
+                    )}
+                    <h1 className="text-xl font-bold">MSHSL Game </h1>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setShowSetup(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
+                      <Settings size={16} /> My Team Setup
+                    </button>
+                    <button onClick={() => setShowImport(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
+                      <Upload size={16} /> Import Data
+                    </button>
+                    <button onClick={() => setShowColorPicker(!showColorPicker)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 text-sm font-semibold">
+                      🎨 Colors
+                    </button>
+                    <button onClick={() => window.print()} className="bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 flex items-center gap-1 text-sm font-semibold">
+                      <Printer size={16} /> Print
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="print-page-1 bg-white p-4 max-w-7xl mx-auto">
+                <div className="rounded-lg p-3 mb-3 text-center" style={{ 
+                  background: `linear-gradient(135deg, ${myTeamSetup.colors.primary}20 0%, ${myTeamSetup.colors.secondary}20 100%)`,
+                  border: `3px solid ${myTeamSetup.colors.primary}`
+                }}>
+                  <div className="flex justify-center items-center gap-4 mb-2">
+                    {myTeamSetup.logo && <img src={myTeamSetup.logo} alt="Team" className="h-16 w-16 object-contain" />}
+                    <div>
+                      <div className="text-xs font-semibold text-gray-600">Game #{myTeamData.nextGame.gameNum || '1'}</div>
+                      <h1 className="text-2xl font-black" style={{ color: myTeamSetup.colors.secondary }}>
+                        {myTeamData.nextGame.date} {myTeamSetup.teamName} ({myTeamData.record.w}-{myTeamData.record.l}-{myTeamData.record.t}, {myTeamData.section}, {myTeamData.conference}) vs {myTeamData.nextGame.opponent} ({myTeamData.nextGame.oppRecord}, {myTeamData.nextGame.oppSection}, {myTeamData.nextGame.oppConference})
+                      </h1>
+                      <div className="text-sm mt-1">{myTeamSetup.arena}</div>
+                      <div className="text-xs mt-1">
+                        <strong>Head Coach:</strong> {myTeamData.headCoach.name} (Career: {totalCoachRecord.w}-{totalCoachRecord.l}-{totalCoachRecord.t})
+                      </div>
+                    </div>
+                    {opponentLogo && <img src={opponentLogo} alt="Opponent" className="h-16 w-16 object-contain" />}
+                  </div>
+                  
+                  <div className="grid grid-cols-4 gap-2 mt-2">
+                    <div className="bg-white rounded p-1 shadow-sm">
+                      <div className="text-xs font-semibold">Power Play</div>
+                      <div className="text-lg font-bold" style={{ color: myTeamSetup.colors.primary }}>{myTeamData.stats.ppPct}%</div>
+                      <div className="text-sm" style={{ color: opponentColors.primary }}>{opponentData.stats.ppPct}%</div>
+                    </div>
+                    <div className="bg-white rounded p-1 shadow-sm">
+                      <div className="text-xs font-semibold">Penalty Kill</div>
+                      <div className="text-lg font-bold" style={{ color: myTeamSetup.colors.primary }}>{myTeamData.stats.pkPct}%</div>
+                      <div className="text-sm" style={{ color: opponentColors.primary }}>{opponentData.stats.pkPct}%</div>
+                    </div>
+                    <div className="bg-white rounded p-1 shadow-sm">
+                      <div className="text-xs font-semibold">Goals/Game</div>
+                      <div className="text-lg font-bold" style={{ color: myTeamSetup.colors.primary }}>{myTeamData.stats.gpg.toFixed(2)}</div>
+                      <div className="text-sm" style={{ color: opponentColors.primary }}>{opponentData.stats.gpg.toFixed(2)}</div>
+                    </div>
+                    <div className="bg-white rounded p-1 shadow-sm">
+                      <div className="text-xs font-semibold">GA/Game</div>
+                      <div className="text-lg font-bold" style={{ color: myTeamSetup.colors.primary }}>{myTeamData.stats.gapg.toFixed(2)}</div>
+                      <div className="text-sm" style={{ color: opponentColors.primary }}>{opponentData.stats.gapg.toFixed(2)}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="no-print bg-gray-100 rounded p-2 mb-3">
+                  <h2 className="text-sm font-bold mb-2">Available Players ({availablePlayers.length})</h2>
+                  <div className="grid grid-cols-5 gap-2">
+                    {availablePlayers.map(player => (
+                      <PlayerCard key={player.id} player={player} source={{ roster: true }} />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mb-3">
+                  <h2 className="text-lg font-bold mb-2">FORWARD LINES</h2>
+                  {['line1', 'line2', 'line3', 'line4'].map((line, idx) => (
+                    <div key={line} className={`mb-2 rounded p-2 border-2 ${colorClasses[lines[line].color]}`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-bold text-sm">Line {idx + 1}</span>
+                        <select
+                          value={lines[line].color}
+                          onChange={(e) => handleLineColorChange(line, e.target.value)}
+                          className="no-print text-xs border rounded px-1"
+                        >
+                          {colorOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                        <div className="flex-1 grid grid-cols-3 gap-2">
+                          <LineSlot line={line} position="lw" label="LW" />
+                          <LineSlot line={line} position="c" label="C" />
+                          <LineSlot line={line} position="rw" label="RW" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <h2 className="text-lg font-bold mb-2">DEFENSE PAIRS</h2>
+                    {['d1', 'd2', 'd3'].map((line, idx) => (
+                      <div key={line} className="mb-2 bg-gray-100 rounded p-2">
+                        <h3 className="font-bold text-sm mb-1">Pair {idx + 1}</h3>
+                        <div className="grid grid-cols-2 gap-2">
+                          <LineSlot line={line} position="ld" label="LD" />
+                          <LineSlot line={line} position="rd" label="RD" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div>
+                    <h2 className="text-lg font-bold mb-2">GOALIES</h2>
+                    <div className="space-y-2 mb-3">
+                      <LineSlot line="goalies" position="starter" label="Starter" />
+                      <LineSlot line="goalies" position="backup" label="Backup" />
+                    </div>
+
+                    <div className="bg-yellow-50 border-2 border-yellow-400 rounded p-2 mt-3">
+                      <h3 className="font-bold text-sm mb-1">Student Manager</h3>
+                      <input
+                        type="text"
+                        value={myTeamData.studentManager}
+                        onChange={(e) => setMyTeamData({...myTeamData, studentManager: e.target.value})}
+                        placeholder="Name"
+                        className="w-full border rounded px-2 py-1 text-sm"
+                      />
+                    </div>
+
+                    <div className="bg-red-50 border-2 border-red-400 rounded p-2 mt-2">
+                      <h3 className="font-bold text-sm mb-1">Injured/Illness</h3>
+                      <textarea
+                        value={myTeamData.injuries.join('\n')}
+                        onChange={(e) => setMyTeamData({...myTeamData, injuries: e.target.value.split('\n')})}
+                        placeholder="Player names (one per line)"
+                        className="w-full border rounded px-2 py-1 text-sm"
+                        rows="2"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  <div className="border-2 rounded p-2" style={{ borderColor: myTeamSetup.colors.primary, background: `${myTeamSetup.colors.primary}10` }}>
+                    <h3 className="font-bold mb-1">Tigers PK</h3>
+                    <textarea
+                      value={coachNotes.pk}
+                      onChange={(e) => setCoachNotes({...coachNotes, pk: e.target.value})}
+                      placeholder="PK notes..."
+                      className="w-full border rounded px-2 py-1 text-sm"
+                      rows="3"
+                    />
+                  </div>
+                  <div className="border-2 rounded p-2" style={{ borderColor: myTeamSetup.colors.primary, background: `${myTeamSetup.colors.primary}10` }}>
+                    <h3 className="font-bold mb-1">Tigers PP</h3>
+                    <textarea
+                      value={coachNotes.pp}
+                      onChange={(e) => setCoachNotes({...coachNotes, pp: e.target.value})}
+                      placeholder="PP notes..."
+                      className="w-full border rounded px-2 py-1 text-sm"
+                      rows="3"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="print-page-2 bg-white p-4 max-w-7xl mx-auto page-break">
+                <div className="rounded-lg p-3 mb-3 flex items-center justify-center gap-4" style={{
+                  background: `linear-gradient(135deg, ${opponentColors.primary}20 0%, ${opponentColors.secondary}20 100%)`,
+                  border: `3px solid ${opponentColors.primary}`
+                }}>
+                  {opponentLogo && <img src={opponentLogo} alt="Opponent" className="h-20 w-20 object-contain" />}
+                  <div className="text-center">
+                    <h1 className="text-3xl font-black" style={{ color: opponentColors.primary }}>OPPONENT SCOUT: {opponentData.teamName}</h1>
+                    <div className="text-lg font-semibold">Record: {opponentData.record.w}-{opponentData.record.l}-{opponentData.record.t}</div>
+                  </div>
+                </div>
+
+                <div className="mb-3">
+                  <h2 className="text-xl font-bold mb-2" style={{ color: opponentColors.primary }}>Opponent Roster</h2>
+                  
+                  <div className="mb-2">
+                    <h3 className="font-bold mb-1 px-2 py-1 rounded text-sm" style={{ background: `${opponentColors.primary}20`, color: opponentColors.secondary }}>Forwards</h3>
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-gray-200">
+                          <th className="border p-1">#</th>
+                          <th className="border p-1 text-left">Name</th>
+                          <th className="border p-1">Gr</th>
+                          <th className="border p-1">GP</th>
+                          <th className="border p-1">G</th>
+                          <th className="border p-1">A</th>
+                          <th className="border p-1">PTS</th>
+                          <th className="border p-1">PPG</th>
+                          <th className="border p-1">PPA</th>
+                          <th className="border p-1">SH</th>
+                          <th className="border p-1">SHA</th>
+                          <th className="border p-1">PIM</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {opponentData.roster
+                          .filter(p => p.position === 'F')
+                          .sort((a, b) => parseInt(a.number) - parseInt(b.number))
+                          .map(player => (
+                            <tr key={player.id}>
+                              <td className="border p-1 font-bold text-center">{player.number}</td>
+                              <td className="border p-1">{player.firstName} {player.lastName}</td>
+                              <td className="border p-1 text-center">{player.grade}</td>
+                              <td className="border p-1 text-center">{player.stats.gp}</td>
+                              <td className="border p-1 text-center">{player.stats.g}</td>
+                              <td className="border p-1 text-center">{player.stats.a}</td>
+                              <td className="border p-1 text-center font-bold">{player.stats.pts}</td>
+                              <td className="border p-1 text-center">{player.stats.ppg}</td>
+                              <td className="border p-1 text-center">{player.stats.ppa}</td>
+                              <td className="border p-1 text-center">{player.stats.sh}</td>
+                              <td className="border p-1 text-center">{player.stats.sha}</td>
+                              <td className="border p-1 text-center">{player.stats.pim}</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="mb-2">
+                    <h3 className="font-bold mb-1 px-2 py-1 rounded text-sm" style={{ background: `${opponentColors.primary}20`, color: opponentColors.secondary }}>Defense</h3>
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-gray-200">
+                          <th className="border p-1">#</th>
+                          <th className="border p-1 text-left">Name</th>
+                          <th className="border p-1">Gr</th>
+                          <th className="border p-1">GP</th>
+                          <th className="border p-1">G</th>
+                          <th className="border p-1">A</th>
+                          <th className="border p-1">PTS</th>
+                          <th className="border p-1">PPG</th>
+                          <th className="border p-1">PPA</th>
+                          <th className="border p-1">SH</th>
+                          <th className="border p-1">SHA</th>
+                          <th className="border p-1">PIM</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {opponentData.roster
+                          .filter(p => p.position === 'D')
+                          .sort((a, b) => parseInt(a.number) - parseInt(b.number))
+                          .map(player => (
+                            <tr key={player.id}>
+                              <td className="border p-1 font-bold text-center">{player.number}</td>
+                              <td className="border p-1">{player.firstName} {player.lastName}</td>
+                              <td className="border p-1 text-center">{player.grade}</td>
+                              <td className="border p-1 text-center">{player.stats.gp}</td>
+                              <td className="border p-1 text-center">{player.stats.g}</td>
+                              <td className="border p-1 text-center">{player.stats.a}</td>
+                              <td className="border p-1 text-center font-bold">{player.stats.pts}</td>
+                              <td className="border p-1 text-center">{player.stats.ppg}</td>
+                              <td className="border p-1 text-center">{player.stats.ppa}</td>
+                              <td className="border p-1 text-center">{player.stats.sh}</td>
+                              <td className="border p-1 text-center">{player.stats.sha}</td>
+                              <td className="border p-1 text-center">{player.stats.pim}</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="mb-2">
+                    <h3 className="font-bold mb-1 px-2 py-1 rounded text-sm" style={{ background: `${opponentColors.primary}20`, color: opponentColors.secondary }}>Goalies</h3>
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-gray-200">
+                          <th className="border p-1">#</th>
+                          <th className="border p-1 text-left">Name</th>
+                          <th className="border p-1">Gr</th>
+                          <th className="border p-1">MIN</th>
+                          <th className="border p-1">W</th>
+                          <th className="border p-1">L</th>
+                          <th className="border p-1">T</th>
+                          <th className="border p-1">SOG</th>
+                          <th className="border p-1">SV</th>
+                          <th className="border p-1">GA</th>
+                          <th className="border p-1">GAA</th>
+                          <th className="border p-1">SV%</th>
+                          <th className="border p-1">SO</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {opponentData.roster
+                          .filter(p => p.position === 'G')
+                          .sort((a, b) => parseInt(a.number) - parseInt(b.number))
+                          .map(player => (
+                            <tr key={player.id}>
+                              <td className="border p-1 font-bold text-center">{player.number}</td>
+                              <td className="border p-1">{player.firstName} {player.lastName}</td>
+                              <td className="border p-1 text-center">{player.grade}</td>
+                              <td className="border p-1 text-center">{player.goalieStats?.min || '0:00'}</td>
+                              <td className="border p-1 text-center">{player.goalieStats?.w || 0}</td>
+                              <td className="border p-1 text-center">{player.goalieStats?.l || 0}</td>
+                              <td className="border p-1 text-center">{player.goalieStats?.t || 0}</td>
+                              <td className="border p-1 text-center">{player.goalieStats?.sog || 0}</td>
+                              <td className="border p-1 text-center">{player.goalieStats?.sv || 0}</td>
+                              <td className="border p-1 text-center">{player.goalieStats?.ga || 0}</td>
+                              <td className="border p-1 text-center font-bold">{player.goalieStats?.gaa.toFixed(2) || '0.00'}</td>
+                              <td className="border p-1 text-center font-bold">{player.goalieStats?.svp || '.000'}</td>
+                              <td className="border p-1 text-center">{player.goalieStats?.so || 0}</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="mt-3 mb-3">
+                  <h2 className="text-xl font-bold mb-2" style={{ color: opponentColors.primary }}>Diagrams & Notes</h2>
+                  
+                  <div className="border-2 border-dashed border-gray-400 rounded p-3 mb-2 bg-gray-50 min-h-[200px]">
+                    <h3 className="font-bold text-sm mb-1">Large Diagram Area</h3>
+                    <div className="text-xs text-gray-500 italic">Paste image or add diagram here</div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    <div className="border-2 border-dashed border-gray-400 rounded p-2 bg-gray-50 min-h-[150px]">
+                      <div className="text-xs text-gray-500 italic">Image 1</div>
+                    </div>
+                    <div className="border-2 border-dashed border-gray-400 rounded p-2 bg-gray-50 min-h-[150px]">
+                      <div className="text-xs text-gray-500 italic">Image 2</div>
+                    </div>
+                    <div className="border-2 border-dashed border-gray-400 rounded p-2 bg-gray-50 min-h-[150px]">
+                      <div className="text-xs text-gray-500 italic">Image 3</div>
+                    </div>
+                  </div>
+                </div>
+
+                {coachNotes.showScoutNotes && (
+                  <div className="mt-3">
+                    <div className="flex justify-between items-center mb-2">
+                      <h2 className="text-xl font-bold" style={{ color: opponentColors.primary }}>Scouting Notes</h2>
+                      <button
+                        onClick={() => setCoachNotes({...coachNotes, showScoutNotes: false})}
+                        className="no-print text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600"
+                      >
+                        Hide Notes
+                      </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="border-2 border-dashed border-gray-400 rounded p-3 bg-gray-50">
+                        <h3 className="font-bold text-sm mb-2">Power Play Setup</h3>
+                        <textarea
+                          value={coachNotes.scoutNotes.powerPlay}
+                          onChange={(e) => setCoachNotes({...coachNotes, scoutNotes: {...coachNotes.scoutNotes, powerPlay: e.target.value}})}
+                          placeholder="PP scouting notes..."
+                          className="w-full border rounded px-2 py-1 text-xs"
+                          rows="6"
+                        />
+                      </div>
+                      <div className="border-2 border-dashed border-gray-400 rounded p-3 bg-gray-50">
+                        <h3 className="font-bold text-sm mb-2">Penalty Kill Setup</h3>
+                        <textarea
+                          value={coachNotes.scoutNotes.penaltyKill}
+                          onChange={(e) => setCoachNotes({...coachNotes, scoutNotes: {...coachNotes.scoutNotes, penaltyKill: e.target.value}})}
+                          placeholder="PK scouting notes..."
+                          className="w-full border rounded px-2 py-1 text-xs"
+                          rows="6"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="border-2 border-dashed border-gray-400 rounded p-3 bg-gray-50 mt-3">
+                      <h3 className="font-bold text-sm mb-2">Key Players & Tendencies</h3>
+                      <textarea
+                        value={coachNotes.scoutNotes.keyPlayers}
+                        onChange={(e) => setCoachNotes({...coachNotes, scoutNotes: {...coachNotes.scoutNotes, keyPlayers: e.target.value}})}
+                        placeholder="Key player notes, tendencies, matchups..."
+                        className="w-full border rounded px-2 py-1 text-xs"
+                        rows="6"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {!coachNotes.showScoutNotes && (
+                  <button
+                    onClick={() => setCoachNotes({...coachNotes, showScoutNotes: true})}
+                    className="no-print mt-3 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                  >
+                    Show Scouting Notes
+                  </button>
+                )}
+              </div>
+
+              <style>{`
+                @media print {
+                  .no-print {
+                    display: none !important;
+                  }
+                  
+                  body {
+                    margin: 0;
+                    padding: 0;
+                  }
+                  
+                  .print-page-1, .print-page-2 {
+                    page-break-after: always;
+                    margin: 0.25in;
+                  }
+                  
+                  .print-page-2 {
+                    page-break-before: always;
+                  }
+                  
+                  @page {
+                    size: portrait;
+                    margin: 0.25in;
+                  }
+                }
+                
+                .page-break {
+                  page-break-before: always;
+                }
+              `}</style>
+            </div>
+          );
+        };
+
+        ReactDOM.render(<HockeyLinesChart />, document.getElementById('root'));
+    </script>
+</body>
+</html>
