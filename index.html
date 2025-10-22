@@ -45,8 +45,13 @@
             logo: null,
             colors: { primary: '#fb923c', secondary: '#1f2937' },
             arena: 'Delano Area Sports Arena, Delano',
-            careerStats: {},
-            pronunciations: {}
+            careerStats: {}, // Will store career totals by player ID
+            pronunciations: {}, // lastName: pronunciation mapping
+            careerSeasonData: {
+              season1: '', // 2024-25 (current/most recent)
+              season2: '', // 2023-24
+              season3: ''  // 2022-23
+            }
           });
 
           const [myTeamData, setMyTeamData] = useState({
@@ -710,37 +715,111 @@ for (let i = 0; i < lines.length; i++) {
           };
 
           const parseCareerStats = (text) => {
-            const lines = text.split('\n').map(l => l.trim());
+            const lines = text.split('\n').map(l => l.trim()).filter(l => l);
             const statsMap = new Map();
             
-            for (let i = 0; i < lines.length; i++) {
-              const line = lines[i];
+            // Find the "Skater" section
+            const skaterIdx = lines.findIndex(l => l === 'Skater');
+            // Find the "Goalie" section  
+            const goalieIdx = lines.findIndex(l => l === 'Goalie');
+            
+            // Parse skater stats
+            if (skaterIdx >= 0) {
+              const skaterEnd = goalieIdx >= 0 ? goalieIdx : lines.length;
               
-              // Try to match skater stats line (same format as current season)
-              const match = line.match(/^(\d+)([A-Za-z\s]+?)(\d+)(\d+)(\d+)(\d+)(\d+)([\d.]+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(-?\d+)(\d+)([\d.]+)/);
-              
-              if (match) {
-                const number = match[1];
-                const fullName = match[2].trim();
-                const nameParts = fullName.split(' ');
-                const lastName = nameParts[nameParts.length - 1].toUpperCase();
-                const firstName = nameParts.slice(0, -1).join(' ').toUpperCase();
+              for (let i = skaterIdx + 1; i < skaterEnd; i++) {
+                const line = lines[i];
                 
-                const stats = {
-                  number,
-                  lastName,
-                  firstName,
-                  gp: parseInt(match[3]) || 0,
-                  g: parseInt(match[4]) || 0,
-                  a: parseInt(match[5]) || 0,
-                  pts: parseInt(match[6]) || 0,
-                  plusMinus: parseInt(match[20]) || 0
-                };
+                // Look for lines that start with # (number) followed by name
+                // Format: #NameGPGAPTSSOG... (all mashed together)
+                const match = line.match(/^(\d+)([A-Za-z\s]+?)(\d+)(\d+)(\d+)(\d+)/);
                 
-                if (!statsMap.has(lastName)) {
-                  statsMap.set(lastName, []);
+                if (match) {
+                  const number = match[1];
+                  const fullName = match[2].trim();
+                  const gp = parseInt(match[3]) || 0;
+                  const g = parseInt(match[4]) || 0;
+                  const a = parseInt(match[5]) || 0;
+                  const pts = parseInt(match[6]) || 0;
+                  
+                  // Extract +/- which appears later in the line
+                  const plusMinusMatch = line.match(/(-?\d+)(\d+)([.\d]+)$/);
+                  const plusMinus = plusMinusMatch ? parseInt(plusMinusMatch[1]) : 0;
+                  
+                  const nameParts = fullName.split(' ');
+                  const lastName = nameParts[nameParts.length - 1];
+                  const firstName = nameParts.slice(0, -1).join(' ');
+                  
+                  const stats = {
+                    number,
+                    lastName,
+                    firstName,
+                    gp,
+                    g,
+                    a,
+                    pts,
+                    plusMinus
+                  };
+                  
+                  const key = `${lastName.toUpperCase()}_${firstName.toUpperCase()}`;
+                  if (!statsMap.has(key)) {
+                    statsMap.set(key, []);
+                  }
+                  statsMap.get(key).push(stats);
                 }
-                statsMap.get(lastName).push(stats);
+              }
+            }
+            
+            // Parse goalie stats
+            if (goalieIdx >= 0) {
+              for (let i = goalieIdx + 1; i < lines.length; i++) {
+                const line = lines[i];
+                
+                // Goalie format: #NameGPMINWLTSOGGASVGAASV%SO
+                const match = line.match(/^(\d+)([A-Za-z\s]+?)(\d+)([\d:]+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)([\d.]+)(\.\d+)(\d+)/);
+                
+                if (match) {
+                  const number = match[1];
+                  const fullName = match[2].trim();
+                  const gp = parseInt(match[3]) || 0;
+                  const min = match[4];
+                  const w = parseInt(match[5]) || 0;
+                  const l = parseInt(match[6]) || 0;
+                  const t = parseInt(match[7]) || 0;
+                  const sog = parseInt(match[8]) || 0;
+                  const ga = parseInt(match[9]) || 0;
+                  const sv = parseInt(match[10]) || 0;
+                  const gaa = parseFloat(match[11]) || 0;
+                  const svp = match[12];
+                  const so = parseInt(match[13]) || 0;
+                  
+                  const nameParts = fullName.split(' ');
+                  const lastName = nameParts[nameParts.length - 1];
+                  const firstName = nameParts.slice(0, -1).join(' ');
+                  
+                  const stats = {
+                    number,
+                    lastName,
+                    firstName,
+                    gp,
+                    min,
+                    w,
+                    l,
+                    t,
+                    sog,
+                    ga,
+                    sv,
+                    gaa,
+                    svp,
+                    so
+                  };
+                  
+                  const key = `${lastName.toUpperCase()}_${firstName.toUpperCase()}`;
+                  if (!statsMap.has(key)) {
+                    statsMap.set(key, []);
+                  }
+                  statsMap.get(key).push(stats);
+                }
               }
             }
             
@@ -748,52 +827,28 @@ for (let i = 0; i < lines.length; i++) {
           };
 
           const matchPlayerToCareerStats = (player, allCareerMaps) => {
-            let bestMatch = null;
+            const playerKey = `${player.lastName.toUpperCase()}_${player.firstName.toUpperCase()}`;
+            let totalStats = { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0 };
+            let found = false;
             
+            // Look through all season maps and sum up stats
             for (const careerMap of allCareerMaps) {
-              const candidates = careerMap.get(player.lastName.toUpperCase());
-              if (!candidates) continue;
+              const seasonStats = careerMap.get(playerKey);
               
-              // Priority 1: Exact first name match
-              let match = candidates.find(c => 
-                c.firstName.toUpperCase() === player.firstName.toUpperCase()
-              );
-              
-              // Priority 2: First name variations (Joe/Joseph, etc.)
-              if (!match) {
-                const firstNameVariations = normalizeFirstName(player.firstName);
-                match = candidates.find(c => {
-                  const candidateVariations = normalizeFirstName(c.firstName);
-                  return firstNameVariations.some(v1 => 
-                    candidateVariations.some(v2 => v1 === v2)
-                  );
+              if (seasonStats && seasonStats.length > 0) {
+                found = true;
+                // Sum stats from this season (there should only be one entry per season)
+                seasonStats.forEach(s => {
+                  totalStats.gp += s.gp || 0;
+                  totalStats.g += s.g || 0;
+                  totalStats.a += s.a || 0;
+                  totalStats.pts += s.pts || 0;
+                  totalStats.plusMinus += s.plusMinus || 0;
                 });
-              }
-              
-              // Priority 3: Jersey number match (same last name)
-              if (!match) {
-                match = candidates.find(c => c.number === player.number);
-              }
-              
-              // Priority 4: If only one player with this last name, use it
-              if (!match && candidates.length === 1) {
-                match = candidates[0];
-              }
-              
-              if (match && !bestMatch) {
-                bestMatch = { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0 };
-              }
-              
-              if (match) {
-                bestMatch.gp += match.gp;
-                bestMatch.g += match.g;
-                bestMatch.a += match.a;
-                bestMatch.pts += match.pts;
-                bestMatch.plusMinus += match.plusMinus;
               }
             }
             
-            return bestMatch || { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0 };
+            return found ? totalStats : null;
           };
 
           const handleCareerStatsImport = () => {
@@ -972,27 +1027,31 @@ for (let i = 0; i < lines.length; i++) {
                     {/* Pronunciation Guide Section */}
                     <div className="bg-purple-50 p-4 rounded mt-4">
                       <h3 className="font-bold mb-2">Player Name Pronunciation Guide</h3>
-                      <p className="text-sm mb-3 text-gray-600">Add phonetic pronunciations for player names (optional)</p>
+                      <p className="text-sm mb-3 text-gray-600">Add phonetic pronunciations for player last names (saved for future use)</p>
                       
                       <div className="space-y-2 max-h-40 overflow-y-auto">
                         {myTeamData.roster.map((player) => (
-                          <div key={player.number} className="flex items-center gap-2">
-                            <span className="text-sm font-semibold w-32">#{player.number} {player.name}:</span>
+                          <div key={player.id} className="flex items-center gap-2">
+                            <span className="text-sm font-semibold w-40">#{player.number} {player.lastName}:</span>
                             <input
                               type="text"
-                              value={player.pronunciation || ''}
+                              value={myTeamSetup.pronunciations[player.lastName] || ''}
                               onChange={(e) => {
-                                const updatedRoster = myTeamData.roster.map(p => 
-                                  p.number === player.number ? {...p, pronunciation: e.target.value} : p
-                                );
-                                setMyTeamData({...myTeamData, roster: updatedRoster});
+                                setMyTeamSetup({
+                                  ...myTeamSetup, 
+                                  pronunciations: {
+                                    ...myTeamSetup.pronunciations,
+                                    [player.lastName]: e.target.value
+                                  }
+                                });
                               }}
-                              placeholder="e.g., MAK-uh-velli"
+                              placeholder='e.g., "HOLL-a-nehn"'
                               className="flex-1 border rounded px-2 py-1 text-sm"
                             />
                           </div>
                         ))}
                       </div>
+                      <p className="text-xs text-gray-500 mt-2">💡 Pronunciations are saved by last name and will auto-apply to future rosters</p>
                     </div>
                     
                     <div className="border-t px-6 py-4 flex justify-end">
