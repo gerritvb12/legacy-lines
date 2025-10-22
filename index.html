@@ -273,58 +273,70 @@ for (let i = 0; i < lines.length; i++) {
 };
 
           const parsePlayerStats = (text, existingRoster) => {
-            const lines = text.split('\n').map(l => l.trim());
-            const updatedRoster = [...existingRoster];
-            
-            for (let i = 0; i < lines.length; i++) {
-              const parts = lines[i].split(/\s+/);
-              
-              if (parts.length > 15 && /^\d+$/.test(parts[0])) {
-                const number = parts[0];
-                const player = updatedRoster.find(p => p.number === number && p.position !== 'G');
-                
-                if (player) {
-                  player.stats = {
-                    gp: parseInt(parts[2]) || 0,
-                    g: parseInt(parts[3]) || 0,
-                    a: parseInt(parts[4]) || 0,
-                    pts: parseInt(parts[5]) || 0,
-                    pim: parseInt(parts[11]) || 0,
-                    plusMinus: parseInt(parts[18]) || 0,
-                    fow: parseInt(parts[12]) || 0,
-                    fol: parseInt(parts[13]) || 0,
-                    ppg: parseInt(parts[7]) || 0,
-                    ppa: parseInt(parts[8]) || 0,
-                    sh: parseInt(parts[9]) || 0,
-                    sha: parseInt(parts[10]) || 0
-                  };
-                }
-              }
-              
-              if (parts.length > 9 && /^\d+$/.test(parts[0]) && parts[1].includes(':')) {
-                const number = parts[0];
-                const player = updatedRoster.find(p => p.number === number && p.position === 'G');
-                
-                if (player && player.goalieStats) {
-                  player.goalieStats = {
-                    gp: parseInt(parts[1]) || 0,
-                    min: parts[2] || '000:00',
-                    w: parseInt(parts[3]) || 0,
-                    l: parseInt(parts[4]) || 0,
-                    t: parseInt(parts[5]) || 0,
-                    sog: parseInt(parts[6]) || 0,
-                    sv: parseInt(parts[7]) || 0,
-                    ga: parseInt(parts[8]) || 0,
-                    gaa: parseFloat(parts[9]) || 0,
-                    svp: parts[10] || '.000',
-                    so: parseInt(parts[11]) || 0
-                  };
-                }
-              }
-            }
-            
-            return updatedRoster;
-          };
+  const lines = text.split('\n').map(l => l.trim());
+  const updatedRoster = [...existingRoster];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // Skip headers and navigation
+    if (!line || line.includes('Skater') || line.includes('Goalie') || line.includes('Printable')) continue;
+    
+    // Try SKATER pattern: Number + Name + 21 stat fields
+    // Example: 12Daniel Halonen2713253813100.0360316322371488886242221.41
+    const skaterMatch = line.match(/^(\d+)([A-Za-z\s]+?)(\d+)(\d+)(\d+)(\d+)(\d+)([\d.]+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(-?\d+)(\d+)([\d.]+)/);
+    
+    if (skaterMatch) {
+      const number = skaterMatch[1];
+      const player = updatedRoster.find(p => p.number === number && p.position !== 'G');
+      
+      if (player) {
+        player.stats = {
+          gp: parseInt(skaterMatch[3]) || 0,
+          g: parseInt(skaterMatch[4]) || 0,
+          a: parseInt(skaterMatch[5]) || 0,
+          pts: parseInt(skaterMatch[6]) || 0,
+          ppg: parseInt(skaterMatch[9]) || 0,
+          ppa: parseInt(skaterMatch[10]) || 0,
+          sh: parseInt(skaterMatch[11]) || 0,
+          sha: parseInt(skaterMatch[12]) || 0,
+          pim: parseInt(skaterMatch[14]) || 0,
+          fow: parseInt(skaterMatch[15]) || 0,
+          fol: parseInt(skaterMatch[16]) || 0,
+          plusMinus: parseInt(skaterMatch[20]) || 0
+        };
+      }
+      continue;
+    }
+    
+    // Try GOALIE pattern: Number + Name + GP + MIN(has colon) + 9 more stats
+    // Example: 1Evan Geyen19929:121360480524282.85.8922
+    const goalieMatch = line.match(/^(\d+)([A-Za-z\s]+?)(\d+)([\d:]+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)([\d.]+)(\.?\d+)(\d+)/);
+    
+    if (goalieMatch) {
+      const number = goalieMatch[1];
+      const player = updatedRoster.find(p => p.number === number && p.position === 'G');
+      
+      if (player && player.goalieStats) {
+        player.goalieStats = {
+          gp: parseInt(goalieMatch[3]) || 0,
+          min: goalieMatch[4] || '0:00',
+          w: parseInt(goalieMatch[5]) || 0,
+          l: parseInt(goalieMatch[6]) || 0,
+          t: parseInt(goalieMatch[7]) || 0,
+          sog: parseInt(goalieMatch[8]) || 0,
+          ga: parseInt(goalieMatch[9]) || 0,
+          sv: parseInt(goalieMatch[10]) || 0,
+          gaa: parseFloat(goalieMatch[11]) || 0,
+          svp: goalieMatch[12] || '.000',
+          so: parseInt(goalieMatch[13]) || 0
+        };
+      }
+    }
+  }
+  
+  return updatedRoster;
+};
 
           const parseTeamStats = (text) => {
             const lines = text.split('\n').map(l => l.trim());
