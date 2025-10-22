@@ -227,40 +227,65 @@ if (careerLine) {
           };
 
           const parseRoster = (text) => {
-  const lines = text.split('\n').map(l => l.trim());
-  const roster = [];
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+  let roster = [];
   
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (!line || line.includes('Printable')) break;
-    
-    // Match: Number + Name + Pos + Grade + Height + Weight + Handedness + Year
-    // Example: 1Evan GeyenG116' 3"185Catches Left2007
-    const match = line.match(/^(\d+)([A-Za-z\s]+?)(G|F|D)(\d{1,2})(\d['"\s]+?)(\d{3})(Right|Left|Catches Left|Catches Right)(\d{4})/);
-    
-    if (match) {
-      const fullName = match[2].trim();
-      const nameParts = fullName.split(' ');
-      const lastName = nameParts[nameParts.length - 1];
-      const firstName = nameParts.slice(0, -1).join(' ');
+  // Find where the roster table starts - look for "Number" header
+  const headerIdx = lines.findIndex(l => l === 'Number' || l.includes('NumberPhotoName'));
+  if (headerIdx === -1) return roster;
+  
+  // Parse each player - they appear after the header
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    // Look for lines that start with a number (jersey number)
+    if (lines[i].match(/^\d+$/)) {
+      const number = lines[i];
+      let name = '';
+      let position = '';
+      let grade = '';
       
-      roster.push({
-        id: Date.now() + i,
-        number: match[1],
-        firstName: firstName.toUpperCase(),
-        lastName: lastName.toUpperCase(),
-        position: match[3],
-        grade: match[4],
-        height: match[5].trim(),
-        weight: match[6],
-        shoots: match[7].includes('Left') ? 'Left' : 'Right',
-        catches: match[3] === 'G' ? (match[7].includes('Left') ? 'Left' : 'Right') : null,
-        birthYear: match[8],
-        pronunciation: myTeamSetup.pronunciations[lastName] || '',
-        stats: { gp: 0, g: 0, a: 0, pts: 0, pim: 0, plusMinus: 0, fow: 0, fol: 0, ppg: 0, ppa: 0, sh: 0, sha: 0 },
-        goalieStats: match[3] === 'G' ? { gp: 0, min: '000:00', w: 0, l: 0, t: 0, sog: 0, sv: 0, ga: 0, gaa: 0, svp: '.000', so: 0 } : null,
-        careerStats: myTeamSetup.careerStats[fullName] || { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0 }
-      });
+      // Next non-empty lines should be: Name, Pos, Grade, Height, Weight, Shoots, DOB
+      let offset = 1;
+      
+      // Skip photo URLs or image indicators
+      while (i + offset < lines.length && (lines[i + offset].includes('http') || lines[i + offset].length === 0)) {
+        offset++;
+      }
+      
+      // Get name (may be two lines: first name, last name)
+      if (i + offset < lines.length) {
+        name = lines[i + offset];
+        // Check if next line is also part of name (last name)
+        if (i + offset + 1 < lines.length && 
+            !['F', 'D', 'G'].includes(lines[i + offset + 1])) {
+          name += ' ' + lines[i + offset + 1];
+          offset++;
+        }
+        offset++;
+      }
+      
+      // Get position (F, D, or G)
+      if (i + offset < lines.length && ['F', 'D', 'G'].includes(lines[i + offset])) {
+        position = lines[i + offset];
+        offset++;
+      }
+      
+      // Get grade
+      if (i + offset < lines.length && lines[i + offset].match(/^\d+$/)) {
+        grade = lines[i + offset];
+        offset++;
+      }
+      
+      // If we have valid player data, add to roster
+      if (name && position) {
+        roster.push({
+          id: `${number}-${name.replace(/\s+/g, '-')}`,
+          number: number,
+          name: name,
+          position: position,
+          grade: grade,
+          stats: { gp: 0, g: 0, a: 0, pts: 0, ppg: 0, ppa: 0, sh: 0, sha: 0, pim: 0 }
+        });
+      }
     }
   }
   
