@@ -146,16 +146,21 @@
             const teamIdx = lines.findIndex(l => l.includes('Tigers') || l.includes('Delano'));
             if (teamIdx >= 0) teamName = lines[teamIdx];
             
-            for (let i = 0; i < lines.length; i++) {
-              const match = lines[i].match(/(\d+)\s+(\d+)\s+(\d+)/);
-              if (match && lines[i].includes('W') && lines[i].includes('L')) {
-                const nextLine = lines[i + 1]?.split(/\s+/);
-                if (nextLine && nextLine.length >= 3) {
-                  record = { w: parseInt(nextLine[0]), l: parseInt(nextLine[1]), t: parseInt(nextLine[2]) };
-                }
-                break;
-              }
-            }
+            // Look for the team record line - format: "15 11 1" (W L T)
+for (let i = 0; i < lines.length; i++) {
+  // Look for "Team Record" header followed by the stats
+  if (lines[i].includes('Team Record') || lines[i].includes('TeamWLT')) {
+    // The next line with 3 numbers is the record
+    for (let j = i; j < i + 5; j++) {
+      const parts = lines[j]?.split(/\s+/);
+      if (parts && parts.length >= 3 && /^\d+$/.test(parts[0]) && /^\d+$/.test(parts[1]) && /^\d+$/.test(parts[2])) {
+        record = { w: parseInt(parts[0]), l: parseInt(parts[1]), t: parseInt(parts[2]) };
+        break;
+      }
+    }
+    break;
+  }
+}
             
             const coachIdx = lines.findIndex(l => l.includes('Head Coach'));
             if (coachIdx >= 0 && coachIdx + 1 < lines.length) {
@@ -192,58 +197,80 @@
           };
 
           const parseRoster = (text) => {
-            const lines = text.split('\n').map(l => l.trim());
-            const roster = [];
-            
-            for (let i = 0; i < lines.length; i++) {
-              const line = lines[i];
-              if (!line || line.includes('Printable')) break;
-              
-              const match = line.match(/^(\d+)([A-Za-z\s]+)(G|F|D)(\d{1,2})([\d'"\s-]+)(\d{3})(Right|Left|Catches Left|Catches Right)/);
-              if (match) {
-                const name = match[2].trim();
-                const lastName = name.split(' ').pop();
-                const firstName = name.split(' ').slice(0, -1).join(' ');
-                
-                roster.push({
-                  id: Date.now() + i,
-                  number: match[1],
-                  firstName: firstName.toUpperCase(),
-                  lastName: lastName.toUpperCase(),
-                  position: match[3],
-                  grade: match[4],
-                  height: match[5].trim(),
-                  weight: match[6],
-                  shoots: match[7].includes('Left') ? 'Left' : 'Right',
-                  catches: match[3] === 'G' ? (match[7].includes('Left') ? 'Left' : 'Right') : null,
-                  pronunciation: myTeamSetup.pronunciations[lastName] || '',
-                  stats: { gp: 0, g: 0, a: 0, pts: 0, pim: 0, plusMinus: 0, fow: 0, fol: 0, ppg: 0, ppa: 0, sh: 0, sha: 0 },
-                  goalieStats: match[3] === 'G' ? { gp: 0, min: '000:00', w: 0, l: 0, t: 0, sog: 0, sv: 0, ga: 0, gaa: 0, svp: '.000', so: 0 } : null,
-                  careerStats: myTeamSetup.careerStats[name] || { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0 }
-                });
-              }
-            }
-            
-            return roster;
-          };
+  const lines = text.split('\n').map(l => l.trim());
+  const roster = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line || line.includes('Printable')) break;
+    
+    // Match: Number + Name + Pos + Grade + Height + Weight + Handedness + Year
+    // Example: 1Evan GeyenG116' 3"185Catches Left2007
+    const match = line.match(/^(\d+)([A-Za-z\s]+?)(G|F|D)(\d{1,2})(\d['"\s]+?)(\d{3})(Right|Left|Catches Left|Catches Right)(\d{4})/);
+    
+    if (match) {
+      const fullName = match[2].trim();
+      const nameParts = fullName.split(' ');
+      const lastName = nameParts[nameParts.length - 1];
+      const firstName = nameParts.slice(0, -1).join(' ');
+      
+      roster.push({
+        id: Date.now() + i,
+        number: match[1],
+        firstName: firstName.toUpperCase(),
+        lastName: lastName.toUpperCase(),
+        position: match[3],
+        grade: match[4],
+        height: match[5].trim(),
+        weight: match[6],
+        shoots: match[7].includes('Left') ? 'Left' : 'Right',
+        catches: match[3] === 'G' ? (match[7].includes('Left') ? 'Left' : 'Right') : null,
+        birthYear: match[8],
+        pronunciation: myTeamSetup.pronunciations[lastName] || '',
+        stats: { gp: 0, g: 0, a: 0, pts: 0, pim: 0, plusMinus: 0, fow: 0, fol: 0, ppg: 0, ppa: 0, sh: 0, sha: 0 },
+        goalieStats: match[3] === 'G' ? { gp: 0, min: '000:00', w: 0, l: 0, t: 0, sog: 0, sv: 0, ga: 0, gaa: 0, svp: '.000', so: 0 } : null,
+        careerStats: myTeamSetup.careerStats[fullName] || { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0 }
+      });
+    }
+  }
+  
+  return roster;
+};
 
           const parseSchedule = (text) => {
-            const lines = text.split('\n').map(l => l.trim());
-            let gameNum = '', opponent = '', date = '', location = '', oppRecord = '', oppSection = '', oppConference = '';
-            
-            for (let i = 0; i < lines.length; i++) {
-              if (lines[i].match(/Game #\d+/)) {
-                gameNum = lines[i].match(/\d+/)[0];
-              }
-              if (lines[i].includes('vs ')) {
-                opponent = lines[i].split('vs ')[1].split('(')[0].trim();
-                const recordMatch = lines[i].match(/\((\d+-\d+-\d+)/);
-                if (recordMatch) oppRecord = recordMatch[1];
-              }
-            }
-            
-            return { gameNum, opponent, date, location, oppRecord, oppSection, oppConference };
-          };
+  const lines = text.split('\n').map(l => l.trim());
+  let gameNum = 0;
+  let nextGame = { gameNum: '', opponent: '', date: '', time: '', location: '', oppRecord: '', oppSection: '', oppConference: '' };
+  
+  // Parse each game line by line (5 lines per game)
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // Look for date line (starts with day of week)
+    if (line.match(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/)) {
+      gameNum++;
+      
+      // Check if next line is "-" (means game not played yet)
+      if (lines[i + 1] === '-') {
+        // This is the next game!
+        nextGame.gameNum = gameNum.toString();
+        nextGame.date = line; // e.g., "Fri Nov 21"
+        
+        // Next lines contain opponent, location, time
+        const opponentLine = lines[i + 2] || '';
+        nextGame.opponent = opponentLine.replace('@', '').trim();
+        
+        nextGame.location = lines[i + 3] || '';
+        nextGame.time = lines[i + 4] || '';
+        
+        // Opponent details will come from their Home page import
+        break; // Found next game, stop looking
+      }
+    }
+  }
+  
+  return nextGame;
+};
 
           const parsePlayerStats = (text, existingRoster) => {
             const lines = text.split('\n').map(l => l.trim());
