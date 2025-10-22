@@ -340,20 +340,36 @@ for (let i = 0; i < lines.length; i++) {
 };
 
           const parseTeamStats = (text) => {
+            console.log('parseTeamStats called with text:', text.substring(0, 200));
             const lines = text.split('\n').map(l => l.trim());
             let stats = { ppPct: 0, pkPct: 0, gpg: 0, gapg: 0 };
             
+            // Try to find the stats line - looking for format: W L T GPG GAPG PP PP% PK PPGA PK%
             for (let i = 0; i < lines.length; i++) {
               const parts = lines[i].split(/\s+/);
-              if (parts.length >= 8 && parts[1].match(/\d+\.\d+/)) {
+              
+              // Format 1: Full stats line with at least 10 fields
+              if (parts.length >= 10 && parts[0].match(/\d+/)) {
+                stats.gpg = parseFloat(parts[3]) || 0;
+                stats.gapg = parseFloat(parts[4]) || 0;
+                stats.ppPct = parseFloat(parts[6]) || 0;
+                stats.pkPct = parseFloat(parts[9]) || 0;
+                console.log('Found stats (format 1):', stats);
+                break;
+              }
+              
+              // Format 2: Alternative format with decimals
+              if (parts.length >= 8 && parts[1]?.match(/\d+\.\d+/)) {
                 stats.gpg = parseFloat(parts[1]) || 0;
                 stats.gapg = parseFloat(parts[2]) || 0;
                 stats.ppPct = parseFloat(parts[4]) || 0;
                 stats.pkPct = parseFloat(parts[7]) || 0;
+                console.log('Found stats (format 2):', stats);
                 break;
               }
             }
             
+            console.log('parseTeamStats returning:', stats);
             return stats;
           };
 
@@ -432,7 +448,9 @@ for (let i = 0; i < lines.length; i++) {
               const updatedRoster = parsePlayerStats(text, myTeamData.roster);
               setMyTeamData(prev => ({ ...prev, roster: updatedRoster }));
             } else if (importStep === 'myTeamTeamStats') {
+              console.log('Importing My Team Team Stats');
               const stats = parseTeamStats(text);
+              console.log('Setting myTeamData stats to:', stats);
               setMyTeamData(prev => ({ ...prev, stats }));
             } else if (importStep === 'oppHome') {
               const parsed = parseHomePage(text);
@@ -440,6 +458,9 @@ for (let i = 0; i < lines.length; i++) {
             } else if (importStep === 'oppRoster') {
               const roster = parseRoster(text);
               setOpponentData(prev => ({ ...prev, roster }));
+            } else if (importStep === 'oppSchedule') {
+              const nextGame = parseSchedule(text);
+              setOpponentData(prev => ({ ...prev, nextGame }));
             } else if (importStep === 'oppPlayerStats') {
               const updatedRoster = parsePlayerStats(text, opponentData.roster);
               setOpponentData(prev => ({ ...prev, roster: updatedRoster }));
