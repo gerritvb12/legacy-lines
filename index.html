@@ -418,8 +418,10 @@ for (let i = 0; i < lines.length; i++) {
             }
             
             if (importStep === 'myTeamHome') {
-              const parsed = parseHomePage(text);
-              setMyTeamData(prev => ({ ...prev, ...parsed }));
+  console.log('Parsing Home Page:', text);
+  const parsed = parseHomePage(text);
+  console.log('Parsed result:', parsed);
+  setMyTeamData(prev => ({ ...prev, ...parsed }));
             } else if (importStep === 'myTeamRoster') {
               const roster = parseRoster(text);
               setMyTeamData(prev => ({ ...prev, roster }));
