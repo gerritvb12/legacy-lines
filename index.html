@@ -1066,22 +1066,29 @@ if (careerLine) {
                     </div>
                     
                     <div className="border-t px-6 py-4 flex justify-between">
-                      <button
-                        onClick={handleSkipStep}
-                        className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
-                      >
-                        Skip Step
-                      </button>
-                      <button
-                        onClick={handleImport}
-                        className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
-                      >
-                        {importSteps.findIndex(s => s.key === importStep) === importSteps.length - 1 ? 'Finish' : 'Next Step'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+  <div className="flex gap-2">
+    {importSteps.findIndex(s => s.key === importStep) > 0 && (
+      <button
+        onClick={handleBackStep}
+        className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+      >
+        Back
+      </button>
+    )}
+    <button
+      onClick={handleSkipStep}
+      className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+    >
+      Skip Step
+    </button>
+  </div>
+  <button
+    onClick={handleImport}
+    className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
+  >
+    {importSteps.findIndex(s => s.key === importStep) === importSteps.length - 1 ? 'Finish' : 'Next Step'}
+  </button>
+</div>
 
               {showColorPicker && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
