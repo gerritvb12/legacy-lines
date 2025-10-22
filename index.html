@@ -112,17 +112,18 @@
           };
 
           const importSteps = [
-            { key: 'myTeamHome', label: 'My Team - Legacy Home', team: 'mine' },
-            { key: 'myTeamRoster', label: 'My Team - Legacy Roster', team: 'mine' },
-            { key: 'myTeamSchedule', label: 'My Team - Legacy Game Schedule', team: 'mine' },
-            { key: 'myTeamPlayerStats', label: 'My Team - Legacy Player Stats', team: 'mine' },
-            { key: 'myTeamTeamStats', label: 'My Team - Legacy Team Stats', team: 'mine' },
-            { key: 'oppLogo', label: 'Opponent - Logo', team: 'opponent', isLogo: true },
-            { key: 'oppHome', label: 'Opponent - Legacy Home', team: 'opponent' },
-            { key: 'oppRoster', label: 'Opponent - Legacy Roster', team: 'opponent' },
-            { key: 'oppPlayerStats', label: 'Opponent - Legacy Player Stats', team: 'opponent' },
-            { key: 'oppTeamStats', label: 'Opponent - Legacy Team Stats', team: 'opponent' }
-          ];
+  { key: 'myTeamHome', label: 'My Team - Legacy Home', team: 'mine' },
+  { key: 'myTeamRoster', label: 'My Team - Legacy Roster', team: 'mine' },
+  { key: 'myTeamSchedule', label: 'My Team - Legacy Game Schedule', team: 'mine' },
+  { key: 'myTeamPlayerStats', label: 'My Team - Legacy Player Stats', team: 'mine' },
+  { key: 'myTeamTeamStats', label: 'My Team - Legacy Team Stats', team: 'mine' },
+  { key: 'oppLogo', label: 'Opponent - Logo', team: 'opponent', isLogo: true },
+  { key: 'oppHome', label: 'Opponent - Legacy Home', team: 'opponent' },
+  { key: 'oppRoster', label: 'Opponent - Legacy Roster', team: 'opponent' },
+  { key: 'oppSchedule', label: 'Opponent - Legacy Game Schedule', team: 'opponent' },
+  { key: 'oppPlayerStats', label: 'Opponent - Legacy Player Stats', team: 'opponent' },
+  { key: 'oppTeamStats', label: 'Opponent - Legacy Team Stats', team: 'opponent' }
+];
 
           useEffect(() => {
             const saved = localStorage.getItem('myTeamSetup');
