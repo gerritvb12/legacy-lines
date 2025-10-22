@@ -424,6 +424,9 @@ for (let i = 0; i < lines.length; i++) {
 
           const handleImport = () => {
             const text = importText;
+            console.log('=== handleImport called ===');
+            console.log('Current importStep:', importStep);
+            console.log('Text length:', text.length);
             
             if (importStep === 'oppLogo') {
               const currentIdx = importSteps.findIndex(s => s.key === importStep);
