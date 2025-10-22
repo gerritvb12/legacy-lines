@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -269,8 +270,9 @@ for (let i = 0; i < lines.length; i++) {
   const lines = text.split('\n').map(l => l.trim());
   let gameNum = 0;
   let nextGame = { gameNum: '', opponent: '', date: '', time: '', location: '', oppRecord: '', oppSection: '', oppConference: '' };
+  let lastGame = { gameNum: '', opponent: '', date: '', time: '', location: '', oppRecord: '', oppSection: '', oppConference: '' };
   
-  // Parse each game line by line (5 lines per game)
+  // Parse each game line by line
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     
@@ -278,11 +280,15 @@ for (let i = 0; i < lines.length; i++) {
     if (line.match(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/)) {
       gameNum++;
       
+      // Store this as the last game seen
+      lastGame.gameNum = gameNum.toString();
+      lastGame.date = line; // e.g., "Sat Feb 22, 2025 @ 7:30p"
+      
       // Check if next line is "-" (means game not played yet)
       if (lines[i + 1] === '-') {
-        // This is the next game!
+        // This is the next unplayed game!
         nextGame.gameNum = gameNum.toString();
-        nextGame.date = line; // e.g., "Fri Nov 21"
+        nextGame.date = line;
         
         // Next lines contain opponent, location, time
         const opponentLine = lines[i + 2] || '';
@@ -291,13 +297,19 @@ for (let i = 0; i < lines.length; i++) {
         nextGame.location = lines[i + 3] || '';
         nextGame.time = lines[i + 4] || '';
         
-        // Opponent details will come from their Home page import
-        break; // Found next game, stop looking
+        return nextGame; // Found next game, return it
+      } else {
+        // Game has been played, extract info for lastGame
+        const opponentLine = lines[i + 2] || '';
+        lastGame.opponent = opponentLine.replace('@', '').trim();
+        lastGame.location = lines[i + 3] || '';
+        lastGame.time = lines[i + 4] || '';
       }
     }
   }
   
-  return nextGame;
+  // If we get here, all games have been played - return the last game
+  return lastGame.gameNum ? lastGame : nextGame;
 };
 
           const parsePlayerStats = (text, existingRoster) => {
@@ -1129,7 +1141,7 @@ for (let i = 0; i < lines.length; i++) {
                     
                     {/* Center - Game Number */}
                     <div className="text-center flex-1 mx-4">
-                      <div className="text-xs font-semibold text-gray-600 mb-2">Game #{myTeamData.nextGame.gameNum || '27'}</div>
+                      <div className="text-xs font-semibold text-gray-600 mb-2">Game #{myTeamData.nextGame.gameNum}</div>
                     </div>
                     
                     {/* Opponent Logo and Coach */}
