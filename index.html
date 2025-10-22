@@ -594,6 +594,146 @@ for (let i = 0; i < lines.length; i++) {
 
           const availablePlayers = myTeamData.roster.filter(p => !getPlayersInLines().has(p.id));
           const currentStepInfo = importSteps.find(s => s.key === importStep);
+          
+          const normalizeFirstName = (name) => {
+            const variations = {
+              'joe': 'joseph', 'joseph': 'joe',
+              'mike': 'michael', 'michael': 'mike',
+              'dan': 'daniel', 'daniel': 'dan',
+              'matt': 'matthew', 'matthew': 'matt',
+              'rob': 'robert', 'robert': 'rob',
+              'tom': 'thomas', 'thomas': 'tom',
+              'jim': 'james', 'james': 'jim',
+              'will': 'william', 'william': 'will',
+              'chris': 'christopher', 'christopher': 'chris',
+              'nick': 'nicholas', 'nicholas': 'nick'
+            };
+            const lower = name.toLowerCase();
+            return variations[lower] ? [lower, variations[lower]] : [lower];
+          };
+
+          const parseCareerStats = (text) => {
+            const lines = text.split('\n').map(l => l.trim());
+            const statsMap = new Map();
+            
+            for (let i = 0; i < lines.length; i++) {
+              const line = lines[i];
+              
+              // Try to match skater stats line (same format as current season)
+              const match = line.match(/^(\d+)([A-Za-z\s]+?)(\d+)(\d+)(\d+)(\d+)(\d+)([\d.]+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(-?\d+)(\d+)([\d.]+)/);
+              
+              if (match) {
+                const number = match[1];
+                const fullName = match[2].trim();
+                const nameParts = fullName.split(' ');
+                const lastName = nameParts[nameParts.length - 1].toUpperCase();
+                const firstName = nameParts.slice(0, -1).join(' ').toUpperCase();
+                
+                const stats = {
+                  number,
+                  lastName,
+                  firstName,
+                  gp: parseInt(match[3]) || 0,
+                  g: parseInt(match[4]) || 0,
+                  a: parseInt(match[5]) || 0,
+                  pts: parseInt(match[6]) || 0,
+                  plusMinus: parseInt(match[20]) || 0
+                };
+                
+                if (!statsMap.has(lastName)) {
+                  statsMap.set(lastName, []);
+                }
+                statsMap.get(lastName).push(stats);
+              }
+            }
+            
+            return statsMap;
+          };
+
+          const matchPlayerToCareerStats = (player, allCareerMaps) => {
+            let bestMatch = null;
+            
+            for (const careerMap of allCareerMaps) {
+              const candidates = careerMap.get(player.lastName.toUpperCase());
+              if (!candidates) continue;
+              
+              // Priority 1: Exact first name match
+              let match = candidates.find(c => 
+                c.firstName.toUpperCase() === player.firstName.toUpperCase()
+              );
+              
+              // Priority 2: First name variations (Joe/Joseph, etc.)
+              if (!match) {
+                const firstNameVariations = normalizeFirstName(player.firstName);
+                match = candidates.find(c => {
+                  const candidateVariations = normalizeFirstName(c.firstName);
+                  return firstNameVariations.some(v1 => 
+                    candidateVariations.some(v2 => v1 === v2)
+                  );
+                });
+              }
+              
+              // Priority 3: Jersey number match (same last name)
+              if (!match) {
+                match = candidates.find(c => c.number === player.number);
+              }
+              
+              // Priority 4: If only one player with this last name, use it
+              if (!match && candidates.length === 1) {
+                match = candidates[0];
+              }
+              
+              if (match && !bestMatch) {
+                bestMatch = { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0 };
+              }
+              
+              if (match) {
+                bestMatch.gp += match.gp;
+                bestMatch.g += match.g;
+                bestMatch.a += match.a;
+                bestMatch.pts += match.pts;
+                bestMatch.plusMinus += match.plusMinus;
+              }
+            }
+            
+            return bestMatch || { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0 };
+          };
+
+          const handleCareerStatsImport = () => {
+            const careerMaps = [];
+            
+            if (careerStatsImport.lastSeason) {
+              careerMaps.push(parseCareerStats(careerStatsImport.lastSeason));
+            }
+            if (careerStatsImport.twoSeasonsAgo) {
+              careerMaps.push(parseCareerStats(careerStatsImport.twoSeasonsAgo));
+            }
+            if (careerStatsImport.threeSeasonsAgo) {
+              careerMaps.push(parseCareerStats(careerStatsImport.threeSeasonsAgo));
+            }
+            
+            if (careerMaps.length === 0) {
+              alert('Please paste at least one season of stats before importing.');
+              return;
+            }
+            
+            const newCareerStats = {};
+            myTeamData.roster.forEach(player => {
+              if (player.position !== 'G') {
+                const careerStats = matchPlayerToCareerStats(player, careerMaps);
+                const key = `${player.firstName} ${player.lastName}`;
+                newCareerStats[key] = careerStats;
+              }
+            });
+            
+            setMyTeamSetup(prev => ({
+              ...prev,
+              careerStats: newCareerStats
+            }));
+            
+            alert(`Successfully imported career stats for ${Object.keys(newCareerStats).length} players!`);
+          };
+          
           const totalCoachRecord = {
             w: myTeamData.headCoach.careerRecord.w + myTeamData.record.w,
             l: myTeamData.headCoach.careerRecord.l + myTeamData.record.l,
