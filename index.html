@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -183,17 +182,19 @@ for (let i = 0; i < lines.length; i++) {
             if (coachIdx >= 0 && coachIdx + 1 < lines.length) {
               headCoach.name = lines[coachIdx + 1];
               
-              // Look for career record in format "11th season, 191-84-5" or "1st Year"
               const careerLine = lines[coachIdx + 2];
-              if (careerLine) {
-                const careerMatch = careerLine.match(/(\d+)-(\d+)-(\d+)/);
-                if (careerMatch) {
-                  // Has career record from previous seasons
-                  headCoach.careerRecord = { 
-                    w: parseInt(careerMatch[1]), 
-                    l: parseInt(careerMatch[2]), 
-                    t: parseInt(careerMatch[3]) 
-                  };
+if (careerLine) {
+  // Look for format "11th season, 191-84-5"
+  const seasonMatch = careerLine.match(/(\d+)(?:st|nd|rd|th)\s+(?:season|Year)/i);
+  const careerMatch = careerLine.match(/(\d+)-(\d+)-(\d+)/);
+  
+  if (careerMatch) {
+    // Has career record from previous seasons
+    headCoach.careerRecord = { 
+      w: parseInt(careerMatch[1]), 
+      l: parseInt(careerMatch[2]), 
+      t: parseInt(careerMatch[3]) 
+    };
                 } else if (careerLine.includes('1st Year') || careerLine.includes('1st year')) {
                   // First year coach - career = current season
                   headCoach.careerRecord = { w: 0, l: 0, t: 0 };
@@ -271,45 +272,45 @@ for (let i = 0; i < lines.length; i++) {
   let gameNum = 0;
   let nextGame = { gameNum: '', opponent: '', date: '', time: '', location: '', oppRecord: '', oppSection: '', oppConference: '' };
   let lastGame = { gameNum: '', opponent: '', date: '', time: '', location: '', oppRecord: '', oppSection: '', oppConference: '' };
+  let foundNextGame = false;
   
   // Parse each game line by line
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     
-    // Look for date line (starts with day of week)
-    if (line.match(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/)) {
+    // Look for date line (starts with day of week) - only count lines that have game info following
+    if (line.match(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/) && i + 1 < lines.length) {
+      // Check if this is actually a game (next line should be score or "-")
+      const nextLine = lines[i + 1];
+      
+      // Skip if next line is empty or doesn't look like a score/dash
+      if (!nextLine || (!nextLine.includes('-') && !nextLine.match(/^\d+$/))) {
+        continue;
+      }
+      
       gameNum++;
       
-      // Store this as the last game seen
-      lastGame.gameNum = gameNum.toString();
-      lastGame.date = line; // e.g., "Sat Feb 22, 2025 @ 7:30p"
+      // Extract game details
+      const opponentLine = lines[i + 2] || '';
+      const locationLine = lines[i + 3] || '';
       
-      // Check if next line is "-" (means game not played yet)
-      if (lines[i + 1] === '-') {
+      // Store as last game
+      lastGame.gameNum = gameNum.toString();
+      lastGame.date = line;
+      lastGame.opponent = opponentLine.replace('@', '').trim();
+      lastGame.location = locationLine;
+      
+      // Check if this game hasn't been played yet (score is just "-")
+      if (nextLine === '-' && !foundNextGame) {
         // This is the next unplayed game!
-        nextGame.gameNum = gameNum.toString();
-        nextGame.date = line;
-        
-        // Next lines contain opponent, location, time
-        const opponentLine = lines[i + 2] || '';
-        nextGame.opponent = opponentLine.replace('@', '').trim();
-        
-        nextGame.location = lines[i + 3] || '';
-        nextGame.time = lines[i + 4] || '';
-        
-        return nextGame; // Found next game, return it
-      } else {
-        // Game has been played, extract info for lastGame
-        const opponentLine = lines[i + 2] || '';
-        lastGame.opponent = opponentLine.replace('@', '').trim();
-        lastGame.location = lines[i + 3] || '';
-        lastGame.time = lines[i + 4] || '';
+        nextGame = { ...lastGame };
+        foundNextGame = true;
       }
     }
   }
   
-  // If we get here, all games have been played - return the last game
-  return lastGame.gameNum ? lastGame : nextGame;
+  // If no unplayed game found, return the last game
+  return foundNextGame ? nextGame : lastGame;
 };
 
           const parsePlayerStats = (text, existingRoster) => {
@@ -1158,7 +1159,7 @@ for (let i = 0; i < lines.length; i++) {
                   </h1>
                   
                   {/* Game Location */}
-                  <div className="text-sm text-center mb-2">{myTeamData.nextGame.location || myTeamSetup.arena}</div>
+<div className="text-sm text-center mb-2">{myTeamData.nextGame.location}</div>
                   
                   <div className="grid grid-cols-4 gap-2 mt-2">
                     <div className="bg-white rounded p-1 shadow-sm">
