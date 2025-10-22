@@ -552,6 +552,14 @@ if (careerLine) {
             }
           };
 
+            const handleBackStep = () => {
+  setImportText('');
+  const currentIdx = importSteps.findIndex(s => s.key === importStep);
+  if (currentIdx > 0) {
+    setImportStep(importSteps[currentIdx - 1].key);
+  }
+};
+
           const handleDragStart = (player, source) => {
             setDraggedPlayer(player);
             setDragSource(source);
