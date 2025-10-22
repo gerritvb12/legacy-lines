@@ -125,13 +125,11 @@
   { key: 'myTeamRoster', label: 'My Team - Legacy Roster', team: 'mine' },
   { key: 'myTeamSchedule', label: 'My Team - Legacy Game Schedule', team: 'mine' },
   { key: 'myTeamPlayerStats', label: 'My Team - Legacy Player Stats', team: 'mine' },
-  { key: 'myTeamTeamStats', label: 'My Team - Legacy Team Stats', team: 'mine' },
   { key: 'oppLogo', label: 'Opponent - Logo', team: 'opponent', isLogo: true },
   { key: 'oppHome', label: 'Opponent - Legacy Home', team: 'opponent' },
   { key: 'oppRoster', label: 'Opponent - Legacy Roster', team: 'opponent' },
   { key: 'oppSchedule', label: 'Opponent - Legacy Game Schedule', team: 'opponent' },
-  { key: 'oppPlayerStats', label: 'Opponent - Legacy Player Stats', team: 'opponent' },
-  { key: 'oppTeamStats', label: 'Opponent - Legacy Team Stats', team: 'opponent' }
+  { key: 'oppPlayerStats', label: 'Opponent - Legacy Player Stats', team: 'opponent' }
 ];
 
           useEffect(() => {
@@ -237,62 +235,50 @@ for (let i = 0; i < lines.length; i++) {
   const lines = text.split('\n').map(l => l.trim()).filter(l => l);
   let roster = [];
   
-  // Find where the roster table starts - look for "Number" header
-  const headerIdx = lines.findIndex(l => l === 'Number' || l.includes('NumberPhotoName'));
-  if (headerIdx === -1) return roster;
+  // Find where roster data starts - look for lines that match player format
+  // Format: #NamePosGradeHeight...
+  // Example: 1Evan GeyenG116' 3"185Catches Left2007
   
-  // Parse each player - they appear after the header
-  for (let i = headerIdx + 1; i < lines.length; i++) {
-    // Look for lines that start with a number (jersey number)
-    if (lines[i].match(/^\d+$/)) {
-      const number = lines[i];
-      let name = '';
-      let position = '';
-      let grade = '';
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // Look for pattern: starts with digit(s), then letters (name), then single letter (F/D/G), then digit(s) (grade)
+    const match = line.match(/^(\d+)([A-Za-z\s]+?)([FDG])(\d{1,2})/);
+    
+    if (match) {
+      const number = match[1];
+      const fullName = match[2].trim();
+      const position = match[3];
+      const grade = match[4];
       
-      // Next non-empty lines should be: Name, Pos, Grade, Height, Weight, Shoots, DOB
-      let offset = 1;
+      // Split name into first and last
+      const nameParts = fullName.split(' ');
+      const lastName = nameParts[nameParts.length - 1];
+      const firstName = nameParts.slice(0, -1).join(' ');
       
-      // Skip photo URLs or image indicators
-      while (i + offset < lines.length && (lines[i + offset].includes('http') || lines[i + offset].length === 0)) {
-        offset++;
+      // Extract "Shoots" or "Catches" for handedness
+      let handed = '';
+      if (line.includes('Left')) {
+        handed = 'L';
+      } else if (line.includes('Right')) {
+        handed = 'R';
+      } else if (line.includes('Catches Left')) {
+        handed = 'L';
+      } else if (line.includes('Catches Right')) {
+        handed = 'R';
       }
       
-      // Get name (may be two lines: first name, last name)
-      if (i + offset < lines.length) {
-        name = lines[i + offset];
-        // Check if next line is also part of name (last name)
-        if (i + offset + 1 < lines.length && 
-            !['F', 'D', 'G'].includes(lines[i + offset + 1])) {
-          name += ' ' + lines[i + offset + 1];
-          offset++;
-        }
-        offset++;
-      }
-      
-      // Get position (F, D, or G)
-      if (i + offset < lines.length && ['F', 'D', 'G'].includes(lines[i + offset])) {
-        position = lines[i + offset];
-        offset++;
-      }
-      
-      // Get grade
-      if (i + offset < lines.length && lines[i + offset].match(/^\d+$/)) {
-        grade = lines[i + offset];
-        offset++;
-      }
-      
-      // If we have valid player data, add to roster
-      if (name && position) {
-        roster.push({
-          id: `${number}-${name.replace(/\s+/g, '-')}`,
-          number: number,
-          name: name,
-          position: position,
-          grade: grade,
-          stats: { gp: 0, g: 0, a: 0, pts: 0, ppg: 0, ppa: 0, sh: 0, sha: 0, pim: 0 }
-        });
-      }
+      roster.push({
+        id: `${number}-${lastName}`,
+        number: number,
+        name: fullName,
+        firstName: firstName,
+        lastName: lastName,
+        position: position,
+        grade: grade,
+        handed: handed,
+        stats: { gp: 0, g: 0, a: 0, pts: 0, ppg: 0, ppa: 0, sh: 0, sha: 0, pim: 0, plusMinus: 0, fow: 0, fol: 0 }
+      });
     }
   }
   
@@ -517,11 +503,6 @@ for (let i = 0; i < lines.length; i++) {
             } else if (importStep === 'myTeamPlayerStats') {
               const updatedRoster = parsePlayerStats(text, myTeamData.roster);
               setMyTeamData(prev => ({ ...prev, roster: updatedRoster }));
-            } else if (importStep === 'myTeamTeamStats') {
-              console.log('Importing My Team Team Stats');
-              const stats = parseTeamStats(text);
-              console.log('Setting myTeamData stats to:', stats);
-              setMyTeamData(prev => ({ ...prev, stats }));
             } else if (importStep === 'oppHome') {
               const parsed = parseHomePage(text);
               setOpponentData(prev => ({ ...prev, ...parsed }));
@@ -534,9 +515,6 @@ for (let i = 0; i < lines.length; i++) {
             } else if (importStep === 'oppPlayerStats') {
               const updatedRoster = parsePlayerStats(text, opponentData.roster);
               setOpponentData(prev => ({ ...prev, roster: updatedRoster }));
-            } else if (importStep === 'oppTeamStats') {
-              const stats = parseTeamStats(text);
-              setOpponentData(prev => ({ ...prev, stats }));
             }
             
             setImportText('');
