@@ -182,26 +182,28 @@ for (let i = 0; i < lines.length; i++) {
             if (coachIdx >= 0 && coachIdx + 1 < lines.length) {
               headCoach.name = lines[coachIdx + 1];
               
-              const careerLine = lines[coachIdx + 2];
-if (careerLine) {
-  // Look for format "11th season, 191-84-5"
-  const seasonMatch = careerLine.match(/(\d+)(?:st|nd|rd|th)\s+(?:season|Year)/i);
-  const careerMatch = careerLine.match(/(\d+)-(\d+)-(\d+)/);
-  
-  if (careerMatch) {
-    // Has career record from previous seasons
-    headCoach.careerRecord = { 
-      w: parseInt(careerMatch[1]), 
-      l: parseInt(careerMatch[2]), 
-      t: parseInt(careerMatch[3]) 
-    };
+              // Look for the career record in the next several lines
+              // Format: "11th season, 191-84-5"
+              for (let i = coachIdx + 1; i < coachIdx + 6 && i < lines.length; i++) {
+                const careerLine = lines[i];
+                const careerMatch = careerLine.match(/(\d+)-(\d+)-(\d+)/);
+                
+                if (careerMatch && careerLine.includes('season')) {
+                  // Has career record
+                  headCoach.careerRecord = { 
+                    w: parseInt(careerMatch[1]), 
+                    l: parseInt(careerMatch[2]), 
+                    t: parseInt(careerMatch[3]) 
+                  };
+                  break;
                 } else if (careerLine.includes('1st Year') || careerLine.includes('1st year')) {
                   // First year coach - career = current season
-                  headCoach.careerRecord = { w: 0, l: 0, t: 0 };
+                  headCoach.careerRecord = { ...record };
+                  break;
                 }
               }
               
-              // Store current season record (will be used to calculate total career)
+              // Store current season record
               headCoach.seasonRecord = { ...record };
             }
             
@@ -830,15 +832,15 @@ if (careerLine) {
           };
           
           const totalCoachRecord = {
-            w: myTeamData.headCoach.careerRecord.w,
-            l: myTeamData.headCoach.careerRecord.l,
-            t: myTeamData.headCoach.careerRecord.t
+            w: myTeamData.headCoach.careerRecord.w + myTeamData.record.w,
+            l: myTeamData.headCoach.careerRecord.l + myTeamData.record.l,
+            t: myTeamData.headCoach.careerRecord.t + myTeamData.record.t
           };
           
           const totalOppCoachRecord = {
-            w: opponentData.headCoach.careerRecord.w,
-            l: opponentData.headCoach.careerRecord.l,
-            t: opponentData.headCoach.careerRecord.t
+            w: opponentData.headCoach.careerRecord.w + opponentData.record.w,
+            l: opponentData.headCoach.careerRecord.l + opponentData.record.l,
+            t: opponentData.headCoach.careerRecord.t + opponentData.record.t
           };
 
           return (
