@@ -96,12 +96,106 @@
             scoutNotes: { powerPlay: '', penaltyKill: '', keyPlayers: '' },
             showScoutNotes: true
           });
+          
+          const [diagramImages, setDiagramImages] = useState({
+            image1: null,
+            image2: null,
+            image3: null
+          });
 
           const [showSetup, setShowSetup] = useState(false);
           const [showImport, setShowImport] = useState(false);
           const [showColorPicker, setShowColorPicker] = useState(false);
           const [importStep, setImportStep] = useState('myTeamHome');
           const [importText, setImportText] = useState('');
+          const [spreadsheetData, setSpreadsheetData] = useState([]);
+          const [spreadsheetHeaders, setSpreadsheetHeaders] = useState([]);
+          
+          // Determine if current step should use spreadsheet view
+          const isSpreadsheetStep = (step) => {
+            return false; // Disabled - using simple text import for all
+          };
+          
+          // Parse pasted spreadsheet data
+          const handleSpreadsheetPaste = (text) => {
+            console.log('=== Parsing spreadsheet paste ===');
+            console.log('Raw text length:', text.length);
+            console.log('First 200 chars:', text.substring(0, 200));
+            
+            const lines = text.split('\n').filter(l => l.trim());
+            console.log('Total lines:', lines.length);
+            console.log('First line:', lines[0]);
+            
+            const rows = lines.map(line => line.split('\t'));
+            console.log('First row split by tabs:', rows[0]);
+            console.log('First row length:', rows[0].length);
+            
+            if (rows.length > 0) {
+              setSpreadsheetHeaders(rows[0]); // First row is headers
+              setSpreadsheetData(rows.slice(1)); // Rest is data
+              console.log('Set headers:', rows[0]);
+              console.log('Set data rows:', rows.length - 1);
+            }
+          };
+          
+          // Process spreadsheet data into player stats
+          const processSpreadsheetStats = (headers, data, existingRoster) => {
+            // Find column indices
+            const getColIndex = (possibleNames) => {
+              return headers.findIndex(h => possibleNames.some(name => 
+                h.toLowerCase().includes(name.toLowerCase())
+              ));
+            };
+            
+            const numCol = getColIndex(['#', 'number']);
+            const nameCol = getColIndex(['name', 'player']);
+            const gpCol = getColIndex(['gp']);
+            const gCol = getColIndex(['g', 'goals']) !== -1 && !headers[getColIndex(['g', 'goals'])].toLowerCase().includes('ga') ? getColIndex(['g', 'goals']) : -1;
+            const aCol = getColIndex(['a', 'assists']);
+            const ptsCol = getColIndex(['pts', 'points']);
+            const ppgCol = getColIndex(['ppg']);
+            const ppaCol = getColIndex(['ppa']);
+            const shCol = getColIndex(['sh']);
+            const shaCol = getColIndex(['sha']);
+            const pimCol = getColIndex(['pim', 'pen']);
+            const plusMinusCol = getColIndex(['+/-', 'plus', 'minus']);
+            const fowCol = getColIndex(['fow']);
+            const folCol = getColIndex(['fol']);
+            
+            // Update roster with stats
+            const updatedRoster = existingRoster.map(player => {
+              // Find matching row by name or number
+              const matchingRow = data.find(row => {
+                const rowName = nameCol >= 0 ? row[nameCol] : '';
+                const rowNum = numCol >= 0 ? row[numCol] : '';
+                return rowName.includes(player.lastName) || rowNum === player.number;
+              });
+              
+              if (matchingRow) {
+                return {
+                  ...player,
+                  stats: {
+                    gp: gpCol >= 0 ? parseInt(matchingRow[gpCol]) || 0 : 0,
+                    g: gCol >= 0 ? parseInt(matchingRow[gCol]) || 0 : 0,
+                    a: aCol >= 0 ? parseInt(matchingRow[aCol]) || 0 : 0,
+                    pts: ptsCol >= 0 ? parseInt(matchingRow[ptsCol]) || 0 : 0,
+                    ppg: ppgCol >= 0 ? parseInt(matchingRow[ppgCol]) || 0 : 0,
+                    ppa: ppaCol >= 0 ? parseInt(matchingRow[ppaCol]) || 0 : 0,
+                    sh: shCol >= 0 ? parseInt(matchingRow[shCol]) || 0 : 0,
+                    sha: shaCol >= 0 ? parseInt(matchingRow[shaCol]) || 0 : 0,
+                    pim: pimCol >= 0 ? parseInt(matchingRow[pimCol]) || 0 : 0,
+                    plusMinus: plusMinusCol >= 0 ? parseInt(matchingRow[plusMinusCol]) || 0 : 0,
+                    fow: fowCol >= 0 ? parseInt(matchingRow[fowCol]) || 0 : 0,
+                    fol: folCol >= 0 ? parseInt(matchingRow[folCol]) || 0 : 0
+                  }
+                };
+              }
+              
+              return player;
+            });
+            
+            return updatedRoster;
+          };
           const [draggedPlayer, setDraggedPlayer] = useState(null);
           const [dragSource, setDragSource] = useState(null);
           const [opponentLogo, setOpponentLogo] = useState(null);
@@ -123,12 +217,10 @@
           const importSteps = [
   { key: 'myTeamHome', label: 'My Team - Legacy Home', team: 'mine' },
   { key: 'myTeamRoster', label: 'My Team - Legacy Roster', team: 'mine' },
-  { key: 'myTeamSchedule', label: 'My Team - Legacy Game Schedule', team: 'mine' },
   { key: 'myTeamPlayerStats', label: 'My Team - Legacy Player Stats', team: 'mine' },
   { key: 'oppLogo', label: 'Opponent - Logo', team: 'opponent', isLogo: true },
   { key: 'oppHome', label: 'Opponent - Legacy Home', team: 'opponent' },
   { key: 'oppRoster', label: 'Opponent - Legacy Roster', team: 'opponent' },
-  { key: 'oppSchedule', label: 'Opponent - Legacy Game Schedule', team: 'opponent' },
   { key: 'oppPlayerStats', label: 'Opponent - Legacy Player Stats', team: 'opponent' }
 ];
 
@@ -142,6 +234,69 @@
           useEffect(() => {
             localStorage.setItem('myTeamSetup', JSON.stringify(myTeamSetup));
           }, [myTeamSetup]);
+
+          // Career Stats localStorage helpers
+          const saveCareerStatsToStorage = (roster) => {
+            const careerData = {};
+            roster.forEach(player => {
+              const key = `${player.lastName?.toUpperCase()}_${player.firstName?.charAt(0)?.toUpperCase()}`;
+              
+              if (player.baseCareerStats && player.baseCareerStats.gp > 0) {
+                careerData[key] = {
+                  type: 'skater',
+                  data: player.baseCareerStats
+                };
+              }
+              
+              if (player.baseCareerGoalieStats && player.baseCareerGoalieStats.gp > 0) {
+                careerData[key] = {
+                  type: 'goalie',
+                  data: player.baseCareerGoalieStats
+                };
+              }
+            });
+            
+            localStorage.setItem('hockey-scout-career-stats', JSON.stringify(careerData));
+            console.log('💾 Saved career stats to localStorage:', Object.keys(careerData).length, 'players');
+          };
+          
+          const loadCareerStatsFromStorage = (roster) => {
+            console.log('🔍 loadCareerStatsFromStorage CALLED with roster size:', roster.length);
+            const stored = localStorage.getItem('hockey-scout-career-stats');
+            console.log('🔍 localStorage contains:', stored ? 'YES' : 'NO');
+            
+            if (!stored) {
+              console.log('❌ No career stats in localStorage');
+              return roster;
+            }
+            
+            const careerData = JSON.parse(stored);
+            console.log('📂 Loading career stats from localStorage:', Object.keys(careerData).length, 'players');
+            console.log('📂 Career data keys:', Object.keys(careerData));
+            
+            return roster.map(player => {
+              const key = `${player.lastName?.toUpperCase()}_${player.firstName?.charAt(0)?.toUpperCase()}`;
+              console.log(`🔍 Looking for key: ${key} for player: ${player.name} (Position: ${player.position})`);
+              const savedCareer = careerData[key];
+              
+              if (savedCareer) {
+                console.log(`✅ Found saved career for ${player.name}:`, savedCareer);
+                
+                // If player is a goalie in the roster, load goalie stats
+                if (player.position === 'G' && savedCareer.type === 'goalie') {
+                  player.baseCareerGoalieStats = savedCareer.data;
+                  console.log(`✅ Loaded GOALIE career for ${player.name}`);
+                } else if (savedCareer.type === 'skater') {
+                  player.baseCareerStats = savedCareer.data;
+                  console.log(`✅ Loaded SKATER career for ${player.name}`);
+                }
+              } else {
+                console.log(`❌ No saved career found for ${player.name} (key: ${key})`);
+              }
+              
+              return player;
+            });
+          };
 
           const parseHomePage = (text) => {
             const lines = text.split('\n').map(l => l.trim()).filter(l => l);
@@ -200,8 +355,8 @@ for (let i = 0; i < lines.length; i++) {
                   };
                   break;
                 } else if (careerLine.includes('1st Year') || careerLine.includes('1st year')) {
-                  // First year coach - career = current season
-                  headCoach.careerRecord = { ...record };
+                  // First year coach - NO career yet, will show current season only
+                  headCoach.careerRecord = { w: 0, l: 0, t: 0 };
                   break;
                 }
               }
@@ -228,60 +383,236 @@ for (let i = 0; i < lines.length; i++) {
               }
             }
             
-            return { teamName, nickname, record, section, conference, headCoach, stats };
+            // Parse Last Game
+            // Format: "Last Game" -> score -> "Final" -> Scoreboard with team names
+            // Team    1  2  3  T
+            // Orono   0  2  3  5
+            // Hibbing/Chisholm 0  0  1  1
+            let lastGame = null;
+            const lastGameIdx = lines.findIndex(l => l === 'Last Game');
+            if (lastGameIdx >= 0) {
+              const scoreLine = lines[lastGameIdx + 1];
+              const scoreMatch = scoreLine?.match(/(\d+)\s*-\s*(\d+)/);
+              
+              if (scoreMatch) {
+                const leftScore = parseInt(scoreMatch[1]);
+                const rightScore = parseInt(scoreMatch[2]);
+                
+                // Find opponent in scoreboard - look for "Team" header, then find the line that's NOT our team
+                let opponent = '';
+                const teamHeaderIdx = lines.findIndex((l, idx) => idx > lastGameIdx && l.includes('Team') && l.includes('1') && l.includes('2'));
+                
+                if (teamHeaderIdx > 0) {
+                  // Next 2-3 lines after "Team" header are team names with scores
+                  for (let i = teamHeaderIdx + 1; i < Math.min(lines.length, teamHeaderIdx + 4); i++) {
+                    const line = lines[i];
+                    // Line should have team name followed by numbers (scores)
+                    // Match: "Hibbing/Chisholm 0  0  1  1" or similar
+                    const teamMatch = line.match(/^([A-Za-z\/\s-]+?)\s+\d/);
+                    if (teamMatch) {
+                      const potentialTeam = teamMatch[1].trim();
+                      // Skip if it's our team name
+                      if (potentialTeam.toLowerCase() !== teamName.toLowerCase()) {
+                        // Capitalize properly
+                        opponent = potentialTeam.split(' ').map(word => 
+                          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                        ).join(' ');
+                        break;
+                      }
+                    }
+                  }
+                }
+                
+                // Fallback: look for "Final" then next substantive line
+                if (!opponent) {
+                  const finalIdx = lines.findIndex((l, idx) => idx > lastGameIdx && l === 'Final');
+                  if (finalIdx > 0) {
+                    for (let i = finalIdx + 1; i < Math.min(lines.length, finalIdx + 4); i++) {
+                      const line = lines[i];
+                      if (line && line.length > 2 && line !== teamName && !line.includes('202') && !line.includes('@')) {
+                        opponent = line.split(' ').map(word => 
+                          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                        ).join(' ');
+                        break;
+                      }
+                    }
+                  }
+                }
+                
+                // Find date/location
+                let date = '';
+                let location = '';
+                for (let i = lastGameIdx + 3; i < Math.min(lines.length, lastGameIdx + 15); i++) {
+                  if (lines[i].includes('@') && lines[i].includes('202')) {
+                    const parts = lines[i].split('|');
+                    date = parts[0]?.trim() || lines[i];
+                    location = parts[1]?.trim() || '';
+                    break;
+                  }
+                }
+                
+                // Determine which score is ours
+                const ourScore = rightScore;
+                const oppScore = leftScore;
+                
+                lastGame = {
+                  opponent,
+                  ourScore,
+                  oppScore,
+                  result: ourScore > oppScore ? 'W' : ourScore < oppScore ? 'L' : 'T',
+                  date,
+                  location
+                };
+              }
+            }
+            
+            // Parse Next Game
+            // Format: Our team name -> "AT" or "VS" -> Opponent -> Date with @
+            let nextGame = null;
+            const nextGameIdx = lines.findIndex(l => l === 'Next Game');
+            if (nextGameIdx >= 0) {
+              let opponent = '';
+              let isHome = false;
+              let date = '';
+              let time = '';
+              
+              // Look for "AT" (we're away) or "VS" (we're home)
+              for (let i = nextGameIdx + 1; i < Math.min(lines.length, nextGameIdx + 10); i++) {
+                if (lines[i] === 'AT') {
+                  isHome = false;
+                  // Opponent should be 2-3 lines after AT
+                  for (let j = i + 1; j < Math.min(lines.length, i + 5); j++) {
+                    if (lines[j] && lines[j].length > 2 && lines[j] !== teamName && !lines[j].includes('@')) {
+                      opponent = lines[j];
+                      break;
+                    }
+                  }
+                  break;
+                } else if (lines[i] === 'VS') {
+                  isHome = true;
+                  // Opponent should be 2-3 lines after VS
+                  for (let j = i + 1; j < Math.min(lines.length, i + 5); j++) {
+                    if (lines[j] && lines[j].length > 2 && lines[j] !== teamName && !lines[j].includes('@')) {
+                      opponent = lines[j];
+                      break;
+                    }
+                  }
+                  break;
+                }
+              }
+              
+              // Look for date line (contains @ and time like "6:00p")
+              for (let i = nextGameIdx + 1; i < Math.min(lines.length, nextGameIdx + 15); i++) {
+                if (lines[i].includes('@') && (lines[i].includes(':') || lines[i].includes('p') || lines[i].includes('a'))) {
+                  const parts = lines[i].split('@');
+                  date = parts[0]?.trim() || '';
+                  time = parts[1]?.trim() || '';
+                  break;
+                }
+              }
+              
+              nextGame = {
+                opponent,
+                isHome,
+                date,
+                time,
+                gameNum: '' // Will be calculated from record
+              };
+            }
+            
+            // Calculate next game number from record (W + L + T + 1)
+            if (nextGame) {
+              nextGame.gameNum = (record.w + record.l + record.t + 1).toString();
+            }
+            
+            return { teamName, nickname, record, section, conference, headCoach, stats, lastGame, nextGame };
           };
 
-          const parseRoster = (text) => {
+          const parseRoster = (text, existingRoster = []) => {
+  console.log('=== parseRoster called ===');
+  console.log('Text length:', text.length);
+  console.log('Existing roster size:', existingRoster.length);
   const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+  console.log('Total lines:', lines.length);
   let roster = [];
   
-  // Find where roster data starts - look for lines that match player format
-  // Format: #NamePosGradeHeight...
-  // Example: 1Evan GeyenG116' 3"185Catches Left2007
+  // Data is tab-separated on individual lines
+  // Format: NUMBER [tab] NAME [tab] POSITION [tab] GRADE [tab] HEIGHT [tab] WEIGHT [tab] SHOOTS/CATCHES [tab] DOB
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     
-    // Look for pattern: starts with digit(s), then letters (name), then single letter (F/D/G), then digit(s) (grade)
-    const match = line.match(/^(\d+)([A-Za-z\s]+?)([FDG])(\d{1,2})/);
+    // Split by tabs
+    const fields = line.split('\t').map(f => f.trim()).filter(f => f);
     
-    if (match) {
-      const number = match[1];
-      const fullName = match[2].trim();
-      const position = match[3];
-      const grade = match[4];
+    // Valid player line has: number, name, position (F/D/G), grade
+    if (fields.length >= 4) {
+      const number = fields[0];
+      const name = fields[1];
+      const position = fields[2];
+      const grade = fields[3];
       
-      // Split name into first and last
-      const nameParts = fullName.split(' ');
-      const lastName = nameParts[nameParts.length - 1];
-      const firstName = nameParts.slice(0, -1).join(' ');
-      
-      // Extract "Shoots" or "Catches" for handedness
-      let handed = '';
-      if (line.includes('Left')) {
-        handed = 'L';
-      } else if (line.includes('Right')) {
-        handed = 'R';
-      } else if (line.includes('Catches Left')) {
-        handed = 'L';
-      } else if (line.includes('Catches Right')) {
-        handed = 'R';
+      // Check if this looks like a player line
+      if (/^\d+$/.test(number) && /^[FDG]$/.test(position) && /^\d{1,2}$/.test(grade)) {
+        console.log('✅ Found player:', { number, name, position, grade, fields });
+        
+        const nameParts = name.split(' ');
+        const lastName = nameParts[nameParts.length - 1];
+        const firstName = nameParts.slice(0, -1).join(' ');
+        
+        // Extract handedness from "Shoots" or "Catches" field (usually field 6)
+        let handed = '';
+        let shoots = ''; // For goalies (catches)
+        for (let j = 4; j < fields.length; j++) {
+          if (fields[j].includes('Left')) {
+            handed = 'L';
+            shoots = 'L';
+            break;
+          } else if (fields[j].includes('Right')) {
+            handed = 'R';
+            shoots = 'R';
+            break;
+          }
+        }
+        
+        // Extract DOB year (usually last field, format: "2007" or "12/15/2007")
+        let dobYear = '';
+        const lastField = fields[fields.length - 1];
+        const yearMatch = lastField.match(/\b(19|20)\d{2}\b/);
+        if (yearMatch) {
+          dobYear = yearMatch[0];
+        }
+        
+        // Check if this player already exists in the existing roster (match by name)
+        const existingPlayer = existingRoster.find(p => 
+          p.lastName?.toUpperCase() === lastName.toUpperCase() && 
+          p.firstName?.charAt(0)?.toUpperCase() === firstName.charAt(0)?.toUpperCase()
+        );
+        
+        roster.push({
+          id: `${number}-${lastName}`,
+          number: number,
+          name: name,
+          firstName: firstName,
+          lastName: lastName,
+          position: position,
+          grade: grade,
+          dobYear: dobYear,
+          handed: handed,
+          shoots: shoots,
+          stats: { gp: 0, g: 0, a: 0, pts: 0, ppg: 0, ppa: 0, sh: 0, sha: 0, pim: 0, plusMinus: 0, fow: 0, fol: 0 },
+          goalieStats: position === 'G' ? { gp: 0, min: '0:00', w: 0, l: 0, t: 0, sog: 0, ga: 0, sv: 0, gaa: 0, svp: '.000', so: 0 } : null,
+          // PRESERVE career data if it exists from previous roster
+          baseCareerStats: existingPlayer?.baseCareerStats || undefined,
+          baseCareerGoalieStats: existingPlayer?.baseCareerGoalieStats || undefined,
+          pronunciation: existingPlayer?.pronunciation || undefined
+        });
       }
-      
-      roster.push({
-        id: `${number}-${lastName}`,
-        number: number,
-        name: fullName,
-        firstName: firstName,
-        lastName: lastName,
-        position: position,
-        grade: grade,
-        handed: handed,
-        stats: { gp: 0, g: 0, a: 0, pts: 0, ppg: 0, ppa: 0, sh: 0, sha: 0, pim: 0, plusMinus: 0, fow: 0, fol: 0 }
-      });
     }
   }
   
+  console.log('Final roster size:', roster.length);
+  console.log('Roster:', roster);
   return roster;
 };
 
@@ -332,70 +663,352 @@ for (let i = 0; i < lines.length; i++) {
 };
 
           const parsePlayerStats = (text, existingRoster) => {
-  const lines = text.split('\n').map(l => l.trim());
-  const updatedRoster = [...existingRoster];
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    
-    // Skip headers and navigation
-    if (!line || line.includes('Skater') || line.includes('Goalie') || line.includes('Printable')) continue;
-    
-    // Try SKATER pattern: Number + Name + 21 stat fields
-    // Example: 12Daniel Halonen2713253813100.0360316322371488886242221.41
-    const skaterMatch = line.match(/^(\d+)([A-Za-z\s]+?)(\d+)(\d+)(\d+)(\d+)(\d+)([\d.]+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)(-?\d+)(\d+)([\d.]+)/);
-    
-    if (skaterMatch) {
-      const number = skaterMatch[1];
-      const player = updatedRoster.find(p => p.number === number && p.position !== 'G');
-      
-      if (player) {
-        player.stats = {
-          gp: parseInt(skaterMatch[3]) || 0,
-          g: parseInt(skaterMatch[4]) || 0,
-          a: parseInt(skaterMatch[5]) || 0,
-          pts: parseInt(skaterMatch[6]) || 0,
-          ppg: parseInt(skaterMatch[9]) || 0,
-          ppa: parseInt(skaterMatch[10]) || 0,
-          sh: parseInt(skaterMatch[11]) || 0,
-          sha: parseInt(skaterMatch[12]) || 0,
-          pim: parseInt(skaterMatch[14]) || 0,
-          fow: parseInt(skaterMatch[15]) || 0,
-          fol: parseInt(skaterMatch[16]) || 0,
-          plusMinus: parseInt(skaterMatch[20]) || 0
-        };
-      }
-      continue;
-    }
-    
-    // Try GOALIE pattern: Number + Name + GP + MIN(has colon) + 9 more stats
-    // Example: 1Evan Geyen19929:121360480524282.85.8922
-    const goalieMatch = line.match(/^(\d+)([A-Za-z\s]+?)(\d+)([\d:]+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)([\d.]+)(\.?\d+)(\d+)/);
-    
-    if (goalieMatch) {
-      const number = goalieMatch[1];
-      const player = updatedRoster.find(p => p.number === number && p.position === 'G');
-      
-      if (player && player.goalieStats) {
-        player.goalieStats = {
-          gp: parseInt(goalieMatch[3]) || 0,
-          min: goalieMatch[4] || '0:00',
-          w: parseInt(goalieMatch[5]) || 0,
-          l: parseInt(goalieMatch[6]) || 0,
-          t: parseInt(goalieMatch[7]) || 0,
-          sog: parseInt(goalieMatch[8]) || 0,
-          ga: parseInt(goalieMatch[9]) || 0,
-          sv: parseInt(goalieMatch[10]) || 0,
-          gaa: parseFloat(goalieMatch[11]) || 0,
-          svp: goalieMatch[12] || '.000',
-          so: parseInt(goalieMatch[13]) || 0
-        };
-      }
-    }
-  }
-  
-  return updatedRoster;
-};
+            console.log('=== parsePlayerStats called ===');
+            const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+            console.log('Total lines:', lines.length);
+            
+            const updatedRoster = [...existingRoster];
+            let inSkaterSection = false;
+            let inGoalieSection = false;
+            
+            for (let i = 0; i < lines.length; i++) {
+              const line = lines[i];
+              
+              // Detect sections
+              if (line === 'Skater') {
+                inSkaterSection = true;
+                inGoalieSection = false;
+                console.log('Found Skater section at line', i);
+                continue;
+              }
+              if (line === 'Goalie') {
+                inSkaterSection = false;
+                inGoalieSection = true;
+                console.log('Found Goalie section at line', i);
+                continue;
+              }
+              
+              // Skip headers
+              if (line === '#' || line === 'Name' || line === 'GP' || line.includes('AVG PTS')) continue;
+              
+              // Split by tabs
+              const fields = line.split('\t').filter(f => f.trim());
+              
+              // Need at least player number and name
+              if (fields.length < 3) continue;
+              
+              const number = fields[0];
+              const name = fields[1];
+              
+              // Must start with a digit
+              if (!/^\d+$/.test(number)) continue;
+              
+              if (inSkaterSection) {
+                const player = updatedRoster.find(p => p.number === number && p.position !== 'G');
+                
+                if (player && fields.length >= 6) {
+                  // DEBUG: Check if baseCareer exists
+                  if (player.baseCareerStats) {
+                    console.log(`🔍 ${name} HAS baseCareer:`, player.baseCareerStats);
+                  } else {
+                    console.log(`⚠️ ${name} has NO baseCareer (rookie or not imported yet)`);
+                  }
+                  
+                  // Current season stats
+                  const currentStats = {
+                    gp: parseInt(fields[2]) || 0,
+                    g: parseInt(fields[3]) || 0,
+                    a: parseInt(fields[4]) || 0,
+                    pts: parseInt(fields[5]) || 0,
+                    ppg: parseInt(fields[8]) || 0,
+                    ppa: parseInt(fields[9]) || 0,
+                    sh: parseInt(fields[10]) || 0,
+                    sha: parseInt(fields[11]) || 0,
+                    pim: parseInt(fields[13]) || 0,
+                    fow: parseInt(fields[14]) || 0,
+                    fol: parseInt(fields[15]) || 0,
+                    plusMinus: parseInt(fields[19]) || 0
+                  };
+                  
+                  player.stats = currentStats;
+                  
+                  // Career stats = base career (from My Team Setup) + current season
+                  // If no baseCareer exists, player is a rookie - career = current only
+                  const baseCareer = player.baseCareerStats || { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0, fow: 0, fol: 0 };
+                  const totalFOW = (baseCareer.fow || 0) + currentStats.fow;
+                  const totalFOL = (baseCareer.fol || 0) + currentStats.fol;
+                  const careerFaceoffPct = (totalFOW + totalFOL > 0) ? ((totalFOW / (totalFOW + totalFOL)) * 100).toFixed(1) : '0.0';
+                  
+                  player.careerStats = {
+                    gp: baseCareer.gp + currentStats.gp,
+                    g: baseCareer.g + currentStats.g,
+                    a: baseCareer.a + currentStats.a,
+                    pts: baseCareer.pts + currentStats.pts,
+                    plusMinus: baseCareer.plusMinus + currentStats.plusMinus,
+                    faceoffPct: careerFaceoffPct,
+                    fow: totalFOW,
+                    fol: totalFOL
+                  };
+                  
+                  console.log(`✅ Updated ${name}:`, player.stats, 'Career:', player.careerStats);
+                }
+              } else if (inGoalieSection) {
+                const player = updatedRoster.find(p => p.number === number && p.position === 'G');
+                
+                if (player && player.goalieStats && fields.length >= 10) {
+                  // Current season goalie stats
+                  // Columns: # | Name | GP | MIN | W | L | T | SOG | GA | SV | GAA | SV% | SO
+                  const currentGoalieStats = {
+                    gp: parseInt(fields[2]) || 0,      // GP
+                    min: fields[3] || '0:00',          // MIN
+                    w: parseInt(fields[4]) || 0,       // W
+                    l: parseInt(fields[5]) || 0,       // L
+                    t: parseInt(fields[6]) || 0,       // T
+                    sog: parseInt(fields[7]) || 0,     // SOG
+                    ga: parseInt(fields[8]) || 0,      // GA
+                    sv: parseInt(fields[9]) || 0,      // SV
+                    gaa: parseFloat(fields[10]) || 0,  // GAA
+                    svp: fields[11] || '.000',         // SV%
+                    so: parseInt(fields[12]) || 0      // SO
+                  };
+                  
+                  player.goalieStats = currentGoalieStats;
+                  
+                  // Career = base career (from My Team Setup) + current season
+                  console.log(`🔍 ${name} baseCareerGoalieStats:`, player.baseCareerGoalieStats);
+                  const baseCareer = player.baseCareerGoalieStats || { gp: 0, min: '0:00', w: 0, l: 0, t: 0, so: 0, ga: 0, sv: 0 };
+                  console.log(`🔍 ${name} using baseCareer:`, baseCareer);
+                  
+                  // Convert minutes to total seconds
+                  const parseMinutes = (minStr) => {
+                    const parts = minStr.split(':');
+                    return parseInt(parts[0]) * 60 + parseInt(parts[1] || 0);
+                  };
+                  
+                  const baseSeconds = parseMinutes(baseCareer.min);
+                  const currSeconds = parseMinutes(currentGoalieStats.min);
+                  const totalSeconds = baseSeconds + currSeconds;
+                  const totalMinStr = `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}`;
+                  
+                  const totalGA = baseCareer.ga + currentGoalieStats.ga;
+                  const totalSV = baseCareer.sv + currentGoalieStats.sv;
+                  const totalSOG = totalGA + totalSV;
+                  
+                  // Career GAA formula: Total GA / (Total Minutes / 51)
+                  const totalMinutes = totalSeconds / 60;
+                  const careerGAA = totalMinutes > 0 ? (totalGA / (totalMinutes / 51)).toFixed(2) : '0.00';
+                  
+                  // Career SV%
+                  const careerSVP = totalSOG > 0 ? (totalSV / totalSOG).toFixed(3) : '.000';
+                  
+                  player.careerGoalieStats = {
+                    gp: baseCareer.gp + currentGoalieStats.gp,
+                    min: totalMinStr,
+                    w: baseCareer.w + currentGoalieStats.w,
+                    l: baseCareer.l + currentGoalieStats.l,
+                    t: baseCareer.t + currentGoalieStats.t,
+                    so: baseCareer.so + currentGoalieStats.so,
+                    ga: totalGA,
+                    sv: totalSV,
+                    gaa: parseFloat(careerGAA),
+                    svp: careerSVP
+                  };
+                  
+                  console.log(`✅ Updated goalie ${name}:`, player.goalieStats, 'Career:', player.careerGoalieStats);
+                }
+              }
+            }
+            
+            console.log('Final updated roster:', updatedRoster);
+            return updatedRoster;
+          };
+
+          const parseCareerStats = (text, existingRoster) => {
+            console.log('=== parseCareerStats called ===');
+            const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+            console.log('Total lines:', lines.length);
+            
+            const updatedRoster = [...existingRoster];
+            let inSkaterSection = false;
+            let inGoalieSection = false;
+            
+            for (let i = 0; i < lines.length; i++) {
+              const line = lines[i];
+              
+              // Detect sections
+              if (line === 'Skater') {
+                inSkaterSection = true;
+                inGoalieSection = false;
+                console.log('Found Skater section at line', i);
+                continue;
+              }
+              if (line === 'Goalie') {
+                inSkaterSection = false;
+                inGoalieSection = true;
+                console.log('Found Goalie section at line', i);
+                continue;
+              }
+              
+              // Skip headers
+              if (line === '#' || line === 'Name' || line === 'GP' || line.includes('AVG PTS')) continue;
+              
+              // Split by tabs
+              const fields = line.split('\t').filter(f => f.trim());
+              
+              // Need at least player number and name
+              if (fields.length < 3) continue;
+              
+              const number = fields[0];
+              const name = fields[1];
+              
+              // Must start with a digit
+              if (!/^\d+$/.test(number)) continue;
+              
+              if (inSkaterSection) {
+                // Normalize number for matching (trim and compare as strings)
+                const normalizedNumber = number.trim();
+                
+                // Extract last name and first initial from career import
+                const careerNameParts = name.trim().split(/\s+/);
+                const careerFirstInitial = careerNameParts[0]?.charAt(0)?.toUpperCase() || '';
+                const careerLastName = careerNameParts[careerNameParts.length - 1]?.toUpperCase() || '';
+                
+                // Try to match by: 1) Last Name + First Initial (primary), 2) Jersey Number (fallback)
+                let player = updatedRoster.find(p => {
+                  if (p.position === 'G') return false; // Skip goalies
+                  
+                  const rosterFirstInitial = p.firstName?.charAt(0)?.toUpperCase() || '';
+                  const rosterLastName = p.lastName?.toUpperCase() || '';
+                  
+                  // Primary match: Last Name + First Initial
+                  const nameMatch = rosterLastName === careerLastName && rosterFirstInitial === careerFirstInitial;
+                  
+                  // Fallback match: Jersey Number (if name doesn't match)
+                  const numberMatch = p.number.toString().trim() === normalizedNumber;
+                  
+                  return nameMatch || numberMatch;
+                });
+                
+                // Log matching attempt
+                if (player) {
+                  const matchType = (player.lastName?.toUpperCase() === careerLastName && 
+                                    player.firstName?.charAt(0)?.toUpperCase() === careerFirstInitial) 
+                                    ? 'by NAME' : 'by NUMBER';
+                  console.log(`Trying to match skater #${normalizedNumber} (${name}): ✅ FOUND ${matchType} → #${player.number} ${player.name}`);
+                } else {
+                  console.log(`Trying to match skater #${normalizedNumber} (${name}): ❌ NOT FOUND`);
+                }
+                
+                if (player && fields.length >= 6) {
+                  // This season's stats from career import
+                  const seasonGP = parseInt(fields[2]) || 0;
+                  const seasonG = parseInt(fields[3]) || 0;
+                  const seasonA = parseInt(fields[4]) || 0;
+                  const seasonPts = parseInt(fields[5]) || 0;
+                  const seasonPlusMinus = parseInt(fields[19]) || 0;
+                  const seasonFOW = parseInt(fields[14]) || 0;
+                  const seasonFOL = parseInt(fields[15]) || 0;
+                  
+                  // Add to existing base career (for multiple season imports)
+                  const existing = player.baseCareerStats || { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0, fow: 0, fol: 0 };
+                  
+                  player.baseCareerStats = {
+                    gp: existing.gp + seasonGP,
+                    g: existing.g + seasonG,
+                    a: existing.a + seasonA,
+                    pts: existing.pts + seasonPts,
+                    plusMinus: existing.plusMinus + seasonPlusMinus,
+                    fow: existing.fow + seasonFOW,
+                    fol: existing.fol + seasonFOL
+                  };
+                  
+                  console.log(`✅ Base career for ${name}:`, player.baseCareerStats);
+                } else if (!player) {
+                  console.log(`❌ No roster match for #${normalizedNumber} ${name}`);
+                }
+              } else if (inGoalieSection) {
+                // Normalize number for matching
+                const normalizedNumber = number.trim();
+                
+                // Extract last name and first initial from career import
+                const careerNameParts = name.trim().split(/\s+/);
+                const careerFirstInitial = careerNameParts[0]?.charAt(0)?.toUpperCase() || '';
+                const careerLastName = careerNameParts[careerNameParts.length - 1]?.toUpperCase() || '';
+                
+                // Try to match by: 1) Last Name + First Initial (primary), 2) Jersey Number (fallback)
+                let player = updatedRoster.find(p => {
+                  if (p.position !== 'G') return false; // Only goalies
+                  
+                  const rosterFirstInitial = p.firstName?.charAt(0)?.toUpperCase() || '';
+                  const rosterLastName = p.lastName?.toUpperCase() || '';
+                  
+                  // Primary match: Last Name + First Initial
+                  const nameMatch = rosterLastName === careerLastName && rosterFirstInitial === careerFirstInitial;
+                  
+                  // Fallback match: Jersey Number
+                  const numberMatch = p.number.toString().trim() === normalizedNumber;
+                  
+                  return nameMatch || numberMatch;
+                });
+                
+                // Log matching attempt
+                if (player) {
+                  const matchType = (player.lastName?.toUpperCase() === careerLastName && 
+                                    player.firstName?.charAt(0)?.toUpperCase() === careerFirstInitial) 
+                                    ? 'by NAME' : 'by NUMBER';
+                  console.log(`Trying to match goalie #${normalizedNumber} (${name}): ✅ FOUND ${matchType} → #${player.number} ${player.name}`);
+                } else {
+                  console.log(`Trying to match goalie #${normalizedNumber} (${name}): ❌ NOT FOUND`);
+                }
+                
+                if (player && fields.length >= 10) {
+                  // Career import goalie stats
+                  // Columns: # | Name | GP | MIN | W | L | T | SOG | GA | SV | GAA | SV% | SO
+                  const seasonGP = parseInt(fields[2]) || 0;      // GP
+                  const seasonMin = fields[3] || '0:00';          // MIN
+                  const seasonW = parseInt(fields[4]) || 0;       // W
+                  const seasonL = parseInt(fields[5]) || 0;       // L
+                  const seasonT = parseInt(fields[6]) || 0;       // T
+                  // Skip SOG (fields[7]) - we calculate from GA + SV
+                  const seasonGA = parseInt(fields[8]) || 0;      // GA
+                  const seasonSV = parseInt(fields[9]) || 0;      // SV
+                  // Skip GAA (fields[10]) - we calculate it
+                  // Skip SV% (fields[11]) - we calculate it
+                  const seasonSO = parseInt(fields[12]) || 0;     // SO
+                  
+                  // Convert minutes to seconds for accumulation
+                  const parseMinutes = (minStr) => {
+                    const parts = minStr.split(':');
+                    return parseInt(parts[0]) * 60 + parseInt(parts[1] || 0);
+                  };
+                  
+                  const existing = player.baseCareerGoalieStats || { gp: 0, min: '0:00', w: 0, l: 0, t: 0, so: 0, ga: 0, sv: 0 };
+                  const existingSeconds = parseMinutes(existing.min);
+                  const seasonSeconds = parseMinutes(seasonMin);
+                  const totalSeconds = existingSeconds + seasonSeconds;
+                  const totalMinStr = `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}`;
+                  
+                  player.baseCareerGoalieStats = {
+                    gp: existing.gp + seasonGP,
+                    min: totalMinStr,
+                    w: existing.w + seasonW,
+                    l: existing.l + seasonL,
+                    t: existing.t + seasonT,
+                    so: existing.so + seasonSO,
+                    ga: existing.ga + seasonGA,
+                    sv: existing.sv + seasonSV
+                  };
+                  
+                  console.log(`✅ Base career goalie for ${name}:`, player.baseCareerGoalieStats);
+                } else if (!player) {
+                  console.log(`❌ No roster match for goalie #${normalizedNumber} ${name}`);
+                }
+              }
+            }
+            
+            console.log('Final roster with career stats:', updatedRoster);
+            return updatedRoster;
+          };
 
           const parseTeamStats = (text) => {
             console.log('parseTeamStats called with text:', text.substring(0, 200));
@@ -489,55 +1102,97 @@ for (let i = 0; i < lines.length; i++) {
               return;
             }
             
-            if (importStep === 'myTeamHome') {
-  console.log('Parsing Home Page:', text);
-  const parsed = parseHomePage(text);
-  console.log('Parsed result:', parsed);
-  setMyTeamData(prev => ({ ...prev, ...parsed }));
-            } else if (importStep === 'myTeamRoster') {
-              const roster = parseRoster(text);
-              setMyTeamData(prev => ({ ...prev, roster }));
-            } else if (importStep === 'myTeamSchedule') {
-              const nextGame = parseSchedule(text);
-              setMyTeamData(prev => ({ ...prev, nextGame }));
-            } else if (importStep === 'myTeamPlayerStats') {
-              const updatedRoster = parsePlayerStats(text, myTeamData.roster);
-              setMyTeamData(prev => ({ ...prev, roster: updatedRoster }));
-            } else if (importStep === 'oppHome') {
-              const parsed = parseHomePage(text);
-              setOpponentData(prev => ({ ...prev, ...parsed }));
-            } else if (importStep === 'oppRoster') {
-              const roster = parseRoster(text);
-              setOpponentData(prev => ({ ...prev, roster }));
-            } else if (importStep === 'oppSchedule') {
-              const nextGame = parseSchedule(text);
-              setOpponentData(prev => ({ ...prev, nextGame }));
-            } else if (importStep === 'oppPlayerStats') {
-              const updatedRoster = parsePlayerStats(text, opponentData.roster);
-              setOpponentData(prev => ({ ...prev, roster: updatedRoster }));
-            }
-            
-            setImportText('');
-            
-            const currentIdx = importSteps.findIndex(s => s.key === importStep);
-            if (currentIdx < importSteps.length - 1) {
-              setImportStep(importSteps[currentIdx + 1].key);
-            } else {
-              setShowImport(false);
+            try {
+              if (importStep === 'myTeamHome') {
+                console.log('Parsing Home Page:', text.substring(0, 200));
+                const parsed = parseHomePage(text);
+                console.log('Parsed result:', parsed);
+                setMyTeamData(prev => ({ ...prev, ...parsed }));
+              } else if (importStep === 'myTeamRoster') {
+                console.log('📥 Importing MY TEAM roster...');
+                let roster = parseRoster(text, myTeamData.roster);
+                console.log('✅ Roster parsed, now loading career stats from localStorage...');
+                // Auto-load career stats from localStorage
+                roster = loadCareerStatsFromStorage(roster);
+                console.log('✅ Career stats loaded, updating state...');
+                setMyTeamData(prev => ({ ...prev, roster }));
+              } else if (importStep === 'myTeamPlayerStats') {
+                console.log('Processing player stats...');
+                const updatedRoster = parsePlayerStats(text, myTeamData.roster);
+                console.log('Updated roster:', updatedRoster);
+                setMyTeamData(prev => ({ ...prev, roster: updatedRoster }));
+              } else if (importStep === 'oppHome') {
+                const parsed = parseHomePage(text);
+                setOpponentData(prev => ({ ...prev, ...parsed }));
+              } else if (importStep === 'oppRoster') {
+                const roster = parseRoster(text, opponentData.roster);
+                setOpponentData(prev => ({ ...prev, roster }));
+              } else if (importStep === 'oppPlayerStats') {
+                const updatedRoster = parsePlayerStats(text, opponentData.roster);
+                setOpponentData(prev => ({ ...prev, roster: updatedRoster }));
+              }
+              
+              setImportText('');
+              
+              const currentIdx = importSteps.findIndex(s => s.key === importStep);
+              if (currentIdx < importSteps.length - 1) {
+                setImportStep(importSteps[currentIdx + 1].key);
+              } else {
+                setShowImport(false);
+              }
+            } catch (error) {
+              console.error('❌ Error in handleImport:', error);
+              alert(`Error importing data: ${error.message}\nCheck console for details.`);
             }
           };
 
           const handleSkipStep = () => {
-            setImportText('');
-            const currentIdx = importSteps.findIndex(s => s.key === importStep);
-            if (currentIdx < importSteps.length - 1) {
-              setImportStep(importSteps[currentIdx + 1].key);
+            // Save current data if any text was entered
+            if (importText.trim()) {
+              handleImport();
             } else {
-              setShowImport(false);
+              // Just move to next step if no data
+              setImportText('');
+              const currentIdx = importSteps.findIndex(s => s.key === importStep);
+              if (currentIdx < importSteps.length - 1) {
+                setImportStep(importSteps[currentIdx + 1].key);
+              } else {
+                setShowImport(false);
+              }
             }
           };
 
             const handleBackStep = () => {
+  // Save current data if any text was entered
+  if (importText.trim()) {
+    try {
+      // Process the current step's data first
+      if (importStep === 'myTeamHome') {
+        const parsed = parseHomePage(importText);
+        setMyTeamData(prev => ({ ...prev, ...parsed }));
+      } else if (importStep === 'myTeamRoster') {
+        let roster = parseRoster(importText, myTeamData.roster);
+        roster = loadCareerStatsFromStorage(roster);
+        setMyTeamData(prev => ({ ...prev, roster }));
+      } else if (importStep === 'myTeamPlayerStats') {
+        const updatedRoster = parsePlayerStats(importText, myTeamData.roster);
+        setMyTeamData(prev => ({ ...prev, roster: updatedRoster }));
+      } else if (importStep === 'oppHome') {
+        const parsed = parseHomePage(importText);
+        setOpponentData(prev => ({ ...prev, ...parsed }));
+      } else if (importStep === 'oppRoster') {
+        const roster = parseRoster(importText, opponentData.roster);
+        setOpponentData(prev => ({ ...prev, roster }));
+      } else if (importStep === 'oppPlayerStats') {
+        const updatedRoster = parsePlayerStats(importText, opponentData.roster);
+        setOpponentData(prev => ({ ...prev, roster: updatedRoster }));
+      }
+    } catch (error) {
+      console.error('Error saving data on back:', error);
+    }
+  }
+  
+  // Then move to previous step
   setImportText('');
   const currentIdx = importSteps.findIndex(s => s.key === importStep);
   if (currentIdx > 0) {
@@ -578,59 +1233,103 @@ for (let i = 0; i < lines.length; i++) {
           const PlayerCard = ({ player, source, compact = false }) => {
             if (!player) return null;
             
+            // Ensure stats object exists with defaults
+            const stats = player.stats || { gp: 0, g: 0, a: 0, pts: 0, ppg: 0, ppa: 0, sh: 0, sha: 0, pim: 0, plusMinus: 0, fow: 0, fol: 0 };
+            const careerStats = player.careerStats || { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0, faceoffPct: '0.0' };
+            
             const isGoalie = player.position === 'G';
-            const faceoffPct = player.stats.fow + player.stats.fol > 0 
-              ? ((player.stats.fow / (player.stats.fow + player.stats.fol)) * 100).toFixed(1)
+            const faceoffPct = stats.fow + stats.fol > 0 
+              ? ((stats.fow / (stats.fow + stats.fol)) * 100).toFixed(1)
               : '0.0';
+            
+            // Convert grade to Sr./Jr./So./Fr. - dobYear
+            const gradeYear = player.grade === 12 || player.grade === '12th' || player.grade === '12' ? 'Sr.' :
+                             player.grade === 11 || player.grade === '11th' || player.grade === '11' ? 'Jr.' :
+                             player.grade === 10 || player.grade === '10th' || player.grade === '10' ? 'So.' :
+                             player.grade === 9 || player.grade === '9th' || player.grade === '9' ? 'Fr.' : 
+                             player.grade;
+            
+            // Use imported DOB year (e.g., "2007")
+            const gradeText = player.dobYear ? `${gradeYear} - ${player.dobYear}` : gradeYear;
+            
+            // Position text - for goalies, show "Left Catch" or "Right Catch"
+            const positionText = isGoalie 
+              ? `${player.shoots === 'L' ? 'Left' : 'Right'} Catch`
+              : player.handed === 'L' ? 'Left' : player.handed === 'R' ? 'Right' : player.handed || '';
             
             return (
               <div
                 draggable={true}
                 onDragStart={() => handleDragStart(player, source)}
-                className="bg-white border-2 border-gray-800 rounded p-2 cursor-move hover:shadow-xl transition-all"
-                style={{ minWidth: compact ? '140px' : '180px', fontSize: '11px' }}
+                className="bg-white border-2 border-gray-800 rounded p-1 cursor-move hover:shadow-xl transition-all"
+                style={{ minWidth: compact ? '130px' : '200px', fontFamily: 'Arial, sans-serif' }}
               >
                 <div className="flex gap-2">
-                  <div className="text-4xl font-black" style={{ lineHeight: '1' }}>{player.number}</div>
-                  <div className="flex-1">
-                    <div className="font-bold text-sm leading-tight">{player.firstName}</div>
-                    <div className="font-bold text-lg leading-tight">{player.lastName}</div>
-                    <div className="text-xs mt-1">
-                      <div className="flex justify-between">
-                        <span>{player.shoots}</span>
-                        <span>{player.grade}th</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>{player.stats.pim} PIM</span>
-                        <span>+/- ({player.stats.plusMinus})</span>
-                      </div>
-                      {!compact && !isGoalie && (
-                        <>
-                          <div className="font-semibold">25-26: {player.stats.gp}GP, {player.stats.g}-{player.stats.a}--{player.stats.pts}</div>
-                          {player.pronunciation && (
-                            <div className="italic">"{player.pronunciation}"</div>
-                          )}
-                          {player.stats.fow + player.stats.fol > 0 && (
-                            <div>Faceoffs: {faceoffPct}%</div>
-                          )}
-                          {player.careerStats.gp > 0 && (
-                            <div className="text-xs bg-blue-50 px-1 rounded mt-1">
-                              Career: {player.careerStats.gp}GP {player.careerStats.g}-{player.careerStats.a}--{player.careerStats.pts}
-                            </div>
-                          )}
-                        </>
-                      )}
-                      {!compact && isGoalie && player.goalieStats && (
-                        <>
-                          <div className="font-semibold">{player.goalieStats.w}-{player.goalieStats.l}-{player.goalieStats.t} ({player.goalieStats.gp})</div>
-                          <div>GAA {player.goalieStats.gaa.toFixed(2)}</div>
-                          {player.pronunciation && (
-                            <div className="italic">"{player.pronunciation}"</div>
-                          )}
-                          <div>SV {player.goalieStats.svp}</div>
-                        </>
-                      )}
+                  {/* LEFT SIDE - Number and Pronunciation */}
+                  <div className="flex flex-col items-center justify-start" style={{ width: '60px' }}>
+                    <div className="text-6xl font-black leading-none" style={{ fontFamily: 'Arial Black, sans-serif' }}>
+                      {player.number}
                     </div>
+                    {player.pronunciation && (
+                      <div className="italic text-center mt-0.5" style={{ fontSize: '8px', lineHeight: '1' }}>
+                        "{player.pronunciation}"
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* RIGHT SIDE - Player Info */}
+                  <div className="flex-1" style={{ fontSize: '9px' }}>
+                    <div className="font-bold text-sm leading-tight mb-0">{player.name}</div>
+                    <div className="flex justify-between text-xs mb-0">
+                      <span style={{ fontSize: '8px' }}>{positionText}</span>
+                      <span style={{ fontSize: '8px' }}>{gradeText}</span>
+                    </div>
+                    <div className="flex justify-between mb-0" style={{ fontSize: '8px' }}>
+                      <span>{stats.pim} PIM</span>
+                      <span>+/- ({stats.plusMinus})</span>
+                    </div>
+                    
+                    {!compact && !isGoalie && (
+                      <>
+                        <div className="font-bold text-right" style={{ fontSize: '8px', lineHeight: '1.1' }}>
+                          25-26: {stats.gp}GP, {stats.g}-{stats.a}--{stats.pts}  +/- ({stats.plusMinus})
+                        </div>
+                        {stats.fow + stats.fol > 0 && (
+                          <div className="font-bold text-right" style={{ fontSize: '8px', lineHeight: '1.1' }}>
+                            Faceoffs {faceoffPct}%
+                          </div>
+                        )}
+                        <div className="text-right" style={{ fontSize: '7px', lineHeight: '1.1' }}>
+                          Career: {careerStats.gp}GP, {careerStats.g}-{careerStats.a}--{careerStats.pts}  +/- ({careerStats.plusMinus})
+                        </div>
+                        {careerStats.faceoffPct && careerStats.faceoffPct !== '0.0' && (
+                          <div className="text-right" style={{ fontSize: '7px', lineHeight: '1.1' }}>
+                            Faceoffs {careerStats.faceoffPct}%
+                          </div>
+                        )}
+                      </>
+                    )}
+                    
+                    {!compact && isGoalie && player.goalieStats && (
+                      <>
+                        <div className="font-bold text-right" style={{ fontSize: '8px', lineHeight: '1.1' }}>
+                          25-26: {player.goalieStats.min}, {player.goalieStats.w}-{player.goalieStats.l}-{player.goalieStats.t} ({player.goalieStats.so} SO)
+                        </div>
+                        <div className="font-bold text-right" style={{ fontSize: '8px', lineHeight: '1.1' }}>
+                          SV {player.goalieStats.sv}  GAA {player.goalieStats.gaa.toFixed(2)}  SV% {player.goalieStats.svp}
+                        </div>
+                        {player.careerGoalieStats && player.careerGoalieStats.gp > 0 && (
+                          <>
+                            <div className="text-right" style={{ fontSize: '7px', lineHeight: '1.1' }}>
+                              Career: {player.careerGoalieStats.min}, {player.careerGoalieStats.w}-{player.careerGoalieStats.l}-{player.careerGoalieStats.t}
+                            </div>
+                            <div className="text-right" style={{ fontSize: '7px', lineHeight: '1.1' }}>
+                              SV {player.careerGoalieStats.sv}  GAA {player.careerGoalieStats.gaa.toFixed(2)}  SV% {player.careerGoalieStats.svp}
+                            </div>
+                          </>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -692,188 +1391,174 @@ for (let i = 0; i < lines.length; i++) {
             return variations[lower] ? [lower, variations[lower]] : [lower];
           };
 
-          const parseCareerStats = (text) => {
-            const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-            const statsMap = new Map();
-            
-            // Find the "Skater" section
-            const skaterIdx = lines.findIndex(l => l === 'Skater');
-            // Find the "Goalie" section  
-            const goalieIdx = lines.findIndex(l => l === 'Goalie');
-            
-            // Parse skater stats
-            if (skaterIdx >= 0) {
-              const skaterEnd = goalieIdx >= 0 ? goalieIdx : lines.length;
-              
-              for (let i = skaterIdx + 1; i < skaterEnd; i++) {
-                const line = lines[i];
-                
-                // Look for lines that start with # (number) followed by name
-                // Format: #NameGPGAPTSSOG... (all mashed together)
-                const match = line.match(/^(\d+)([A-Za-z\s]+?)(\d+)(\d+)(\d+)(\d+)/);
-                
-                if (match) {
-                  const number = match[1];
-                  const fullName = match[2].trim();
-                  const gp = parseInt(match[3]) || 0;
-                  const g = parseInt(match[4]) || 0;
-                  const a = parseInt(match[5]) || 0;
-                  const pts = parseInt(match[6]) || 0;
-                  
-                  // Extract +/- which appears later in the line
-                  const plusMinusMatch = line.match(/(-?\d+)(\d+)([.\d]+)$/);
-                  const plusMinus = plusMinusMatch ? parseInt(plusMinusMatch[1]) : 0;
-                  
-                  const nameParts = fullName.split(' ');
-                  const lastName = nameParts[nameParts.length - 1];
-                  const firstName = nameParts.slice(0, -1).join(' ');
-                  
-                  const stats = {
-                    number,
-                    lastName,
-                    firstName,
-                    gp,
-                    g,
-                    a,
-                    pts,
-                    plusMinus
-                  };
-                  
-                  const key = `${lastName.toUpperCase()}_${firstName.toUpperCase()}`;
-                  if (!statsMap.has(key)) {
-                    statsMap.set(key, []);
-                  }
-                  statsMap.get(key).push(stats);
-                }
-              }
-            }
-            
-            // Parse goalie stats
-            if (goalieIdx >= 0) {
-              for (let i = goalieIdx + 1; i < lines.length; i++) {
-                const line = lines[i];
-                
-                // Goalie format: #NameGPMINWLTSOGGASVGAASV%SO
-                const match = line.match(/^(\d+)([A-Za-z\s]+?)(\d+)([\d:]+)(\d+)(\d+)(\d+)(\d+)(\d+)(\d+)([\d.]+)(\.\d+)(\d+)/);
-                
-                if (match) {
-                  const number = match[1];
-                  const fullName = match[2].trim();
-                  const gp = parseInt(match[3]) || 0;
-                  const min = match[4];
-                  const w = parseInt(match[5]) || 0;
-                  const l = parseInt(match[6]) || 0;
-                  const t = parseInt(match[7]) || 0;
-                  const sog = parseInt(match[8]) || 0;
-                  const ga = parseInt(match[9]) || 0;
-                  const sv = parseInt(match[10]) || 0;
-                  const gaa = parseFloat(match[11]) || 0;
-                  const svp = match[12];
-                  const so = parseInt(match[13]) || 0;
-                  
-                  const nameParts = fullName.split(' ');
-                  const lastName = nameParts[nameParts.length - 1];
-                  const firstName = nameParts.slice(0, -1).join(' ');
-                  
-                  const stats = {
-                    number,
-                    lastName,
-                    firstName,
-                    gp,
-                    min,
-                    w,
-                    l,
-                    t,
-                    sog,
-                    ga,
-                    sv,
-                    gaa,
-                    svp,
-                    so
-                  };
-                  
-                  const key = `${lastName.toUpperCase()}_${firstName.toUpperCase()}`;
-                  if (!statsMap.has(key)) {
-                    statsMap.set(key, []);
-                  }
-                  statsMap.get(key).push(stats);
-                }
-              }
-            }
-            
-            return statsMap;
-          };
-
-          const matchPlayerToCareerStats = (player, allCareerMaps) => {
-            const playerKey = `${player.lastName.toUpperCase()}_${player.firstName.toUpperCase()}`;
-            let totalStats = { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0 };
-            let found = false;
-            
-            // Look through all season maps and sum up stats
-            for (const careerMap of allCareerMaps) {
-              const seasonStats = careerMap.get(playerKey);
-              
-              if (seasonStats && seasonStats.length > 0) {
-                found = true;
-                // Sum stats from this season (there should only be one entry per season)
-                seasonStats.forEach(s => {
-                  totalStats.gp += s.gp || 0;
-                  totalStats.g += s.g || 0;
-                  totalStats.a += s.a || 0;
-                  totalStats.pts += s.pts || 0;
-                  totalStats.plusMinus += s.plusMinus || 0;
-                });
-              }
-            }
-            
-            return found ? totalStats : null;
-          };
-
           const handleCareerStatsImport = () => {
-            const careerMaps = [];
-            
-            if (careerStatsImport.lastSeason) {
-              careerMaps.push(parseCareerStats(careerStatsImport.lastSeason));
-            }
-            if (careerStatsImport.twoSeasonsAgo) {
-              careerMaps.push(parseCareerStats(careerStatsImport.twoSeasonsAgo));
-            }
-            if (careerStatsImport.threeSeasonsAgo) {
-              careerMaps.push(parseCareerStats(careerStatsImport.threeSeasonsAgo));
-            }
-            
-            if (careerMaps.length === 0) {
-              alert('Please paste at least one season of stats before importing.');
-              return;
-            }
-            
-            const newCareerStats = {};
-            myTeamData.roster.forEach(player => {
-              if (player.position !== 'G') {
-                const careerStats = matchPlayerToCareerStats(player, careerMaps);
-                const key = `${player.firstName} ${player.lastName}`;
-                newCareerStats[key] = careerStats;
+            try {
+              // Combine all seasons into one import (they'll accumulate)
+              const allSeasons = [
+                careerStatsImport.lastSeason,
+                careerStatsImport.twoSeasonsAgo,
+                careerStatsImport.threeSeasonsAgo
+              ].filter(s => s.trim());
+              
+              if (allSeasons.length === 0) {
+                alert('Please paste at least one season of stats before importing.');
+                return;
               }
-            });
-            
-            setMyTeamSetup(prev => ({
-              ...prev,
-              careerStats: newCareerStats
-            }));
-            
-            alert(`Successfully imported career stats for ${Object.keys(newCareerStats).length} players!`);
+              
+              // Parse career stats directly into storage format (no roster needed!)
+              const careerData = {};
+              
+              allSeasons.forEach((seasonText, seasonIdx) => {
+                console.log(`📊 Processing season ${seasonIdx + 1}...`);
+                const lines = seasonText.split('\n').map(l => l.trim()).filter(l => l);
+                
+                let inSkaterSection = false;
+                let inGoalieSection = false;
+                
+                for (let i = 0; i < lines.length; i++) {
+                  const line = lines[i];
+                  
+                  // Detect sections
+                  if (line === 'Skater') {
+                    inSkaterSection = true;
+                    inGoalieSection = false;
+                    continue;
+                  }
+                  if (line === 'Goalie') {
+                    inSkaterSection = false;
+                    inGoalieSection = true;
+                    continue;
+                  }
+                  
+                  // Skip headers
+                  if (line === '#' || line === 'Name' || line === 'GP' || line.includes('AVG PTS')) continue;
+                  
+                  // Split by tabs
+                  const fields = line.split('\t').filter(f => f.trim());
+                  
+                  // Need at least player number and name
+                  if (fields.length < 3) continue;
+                  
+                  const number = fields[0];
+                  const name = fields[1];
+                  
+                  // Must start with a digit
+                  if (!/^\d+$/.test(number)) continue;
+                  
+                  // Extract last name and first initial
+                  const nameParts = name.trim().split(/\s+/);
+                  const firstInitial = nameParts[0]?.charAt(0)?.toUpperCase() || '';
+                  const lastName = nameParts[nameParts.length - 1]?.toUpperCase() || '';
+                  const key = `${lastName}_${firstInitial}`;
+                  
+                  if (inSkaterSection && fields.length >= 6) {
+                    const seasonGP = parseInt(fields[2]) || 0;
+                    const seasonG = parseInt(fields[3]) || 0;
+                    const seasonA = parseInt(fields[4]) || 0;
+                    const seasonPts = parseInt(fields[5]) || 0;
+                    const seasonPlusMinus = parseInt(fields[19]) || 0;
+                    const seasonFOW = parseInt(fields[14]) || 0;
+                    const seasonFOL = parseInt(fields[15]) || 0;
+                    
+                    // Skip if this player already exists as a goalie (goalies can appear in skater section with 0 stats)
+                    if (careerData[key]?.type === 'goalie') {
+                      console.log(`⏭️ Skipping skater stats for ${name} - already saved as goalie`);
+                      continue;
+                    }
+                    
+                    // Accumulate across multiple seasons
+                    if (!careerData[key]) {
+                      careerData[key] = {
+                        type: 'skater',
+                        data: { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0, fow: 0, fol: 0 }
+                      };
+                    }
+                    
+                    careerData[key].data.gp += seasonGP;
+                    careerData[key].data.g += seasonG;
+                    careerData[key].data.a += seasonA;
+                    careerData[key].data.pts += seasonPts;
+                    careerData[key].data.plusMinus += seasonPlusMinus;
+                    careerData[key].data.fow += seasonFOW;
+                    careerData[key].data.fol += seasonFOL;
+                    
+                    console.log(`✅ Added skater career for ${name} (${key}):`, careerData[key].data);
+                  } else if (inGoalieSection && fields.length >= 10) {
+                    const seasonGP = parseInt(fields[2]) || 0;
+                    const seasonMin = fields[3] || '0:00';
+                    const seasonW = parseInt(fields[4]) || 0;
+                    const seasonL = parseInt(fields[5]) || 0;
+                    const seasonT = parseInt(fields[6]) || 0;
+                    const seasonSO = parseInt(fields[12]) || 0;  // SO is field 12
+                    const seasonGA = parseInt(fields[8]) || 0;
+                    const seasonSV = parseInt(fields[9]) || 0;
+                    
+                    // GOALIE ALWAYS OVERWRITES SKATER - Convert any existing skater data to goalie
+                    if (careerData[key]?.type === 'skater') {
+                      console.log(`🔄 Converting ${name} from skater to goalie`);
+                    }
+                    
+                    // Accumulate across multiple seasons (or initialize if first time OR converting from skater)
+                    if (!careerData[key] || careerData[key].type !== 'goalie') {
+                      careerData[key] = {
+                        type: 'goalie',
+                        data: { gp: 0, min: '0:00', w: 0, l: 0, t: 0, so: 0, ga: 0, sv: 0 }
+                      };
+                    }
+                    
+                    // Parse minutes safely
+                    const seasonMinStr = seasonMin || '0:00';
+                    const seasonMinParts = seasonMinStr.toString().split(':');
+                    const minMinutes = parseInt(seasonMinParts[0]) || 0;
+                    const minSeconds = parseInt(seasonMinParts[1]) || 0;
+                    const totalSeasonSeconds = minMinutes * 60 + minSeconds;
+                    
+                    const existingMinStr = careerData[key].data.min || '0:00';
+                    const existingMinParts = existingMinStr.toString().split(':');
+                    const existingMinutes = parseInt(existingMinParts[0]) || 0;
+                    const existingSeconds = parseInt(existingMinParts[1]) || 0;
+                    const existingTotalSeconds = existingMinutes * 60 + existingSeconds;
+                    
+                    const newTotalSeconds = existingTotalSeconds + totalSeasonSeconds;
+                    const newMinutes = Math.floor(newTotalSeconds / 60);
+                    const newSeconds = newTotalSeconds % 60;
+                    
+                    careerData[key].data.gp += seasonGP;
+                    careerData[key].data.min = `${newMinutes}:${String(newSeconds).padStart(2, '0')}`;
+                    careerData[key].data.w += seasonW;
+                    careerData[key].data.l += seasonL;
+                    careerData[key].data.t += seasonT;
+                    careerData[key].data.so += seasonSO;
+                    careerData[key].data.ga += seasonGA;
+                    careerData[key].data.sv += seasonSV;
+                    
+                    console.log(`✅ Added goalie career for ${name} (${key}):`, careerData[key].data);
+                  }
+                }
+              });
+              
+              // Save directly to localStorage
+              localStorage.setItem('hockey-scout-career-stats', JSON.stringify(careerData));
+              console.log('💾 Saved career stats to localStorage:', Object.keys(careerData).length, 'players');
+              console.log('💾 Career data keys:', Object.keys(careerData));
+              
+              alert(`✅ Successfully imported career stats for ${Object.keys(careerData).length} players!\n\n💾 Career stats saved to browser storage and will automatically load when you import your roster.`);
+            } catch (error) {
+              console.error('Career stats import error:', error);
+              alert(`Error importing career stats: ${error.message}`);
+            }
           };
           
           const totalCoachRecord = {
-            w: myTeamData.headCoach.careerRecord.w + myTeamData.record.w,
-            l: myTeamData.headCoach.careerRecord.l + myTeamData.record.l,
-            t: myTeamData.headCoach.careerRecord.t + myTeamData.record.t
+            w: (myTeamData.headCoach.careerRecord.w || 0) + myTeamData.record.w,
+            l: (myTeamData.headCoach.careerRecord.l || 0) + myTeamData.record.l,
+            t: (myTeamData.headCoach.careerRecord.t || 0) + myTeamData.record.t
           };
           
           const totalOppCoachRecord = {
-            w: opponentData.headCoach.careerRecord.w + opponentData.record.w,
-            l: opponentData.headCoach.careerRecord.l + opponentData.record.l,
-            t: opponentData.headCoach.careerRecord.t + opponentData.record.t
+            w: (opponentData.headCoach.careerRecord.w || 0) + opponentData.record.w,
+            l: (opponentData.headCoach.careerRecord.l || 0) + opponentData.record.l,
+            t: (opponentData.headCoach.careerRecord.t || 0) + opponentData.record.t
           };
 
           return (
@@ -957,11 +1642,11 @@ for (let i = 0; i < lines.length; i++) {
                     {/* Career Stats Import Section */}
                     <div className="bg-blue-50 p-4 rounded">
                       <h3 className="font-bold mb-2">Career Stats Import</h3>
-                      <p className="text-sm mb-3 text-gray-600">Import previous seasons' stats to show career totals (paste from Legacy Player Stats page)</p>
+                      <p className="text-sm mb-3 text-gray-600">Paste previous seasons' stats from Legacy Player Stats page to show career totals on player cards.</p>
                       
                       <div className="space-y-3">
                         <div>
-                          <label className="block text-sm font-semibold mb-1">Last Season Final Player Stats</label>
+                          <label className="block text-sm font-semibold mb-1">Last Season Legacy Final Player Stats</label>
                           <textarea
                             value={careerStatsImport.lastSeason}
                             onChange={(e) => setCareerStatsImport({...careerStatsImport, lastSeason: e.target.value})}
@@ -972,7 +1657,7 @@ for (let i = 0; i < lines.length; i++) {
                         </div>
                         
                         <div>
-                          <label className="block text-sm font-semibold mb-1">2 Seasons Ago Final Player Stats</label>
+                          <label className="block text-sm font-semibold mb-1">2 Seasons Ago Legacy Final Player Stats</label>
                           <textarea
                             value={careerStatsImport.twoSeasonsAgo}
                             onChange={(e) => setCareerStatsImport({...careerStatsImport, twoSeasonsAgo: e.target.value})}
@@ -983,7 +1668,7 @@ for (let i = 0; i < lines.length; i++) {
                         </div>
                         
                         <div>
-                          <label className="block text-sm font-semibold mb-1">3 Seasons Ago Final Player Stats</label>
+                          <label className="block text-sm font-semibold mb-1">3 Seasons Ago Legacy Final Player Stats</label>
                           <textarea
                             value={careerStatsImport.threeSeasonsAgo}
                             onChange={(e) => setCareerStatsImport({...careerStatsImport, threeSeasonsAgo: e.target.value})}
@@ -1095,6 +1780,52 @@ for (let i = 0; i < lines.length; i++) {
                               </button>
                             </div>
                           </div>
+                        </div>
+                      ) : isSpreadsheetStep(importStep) ? (
+                        <div>
+                          <label className="block text-sm font-semibold mb-2">
+                            Paste player stats from Legacy Hockey
+                          </label>
+                          <p className="text-xs text-gray-600 mb-3">
+                            Go to Player Stats page → Select all (Ctrl+A) → Copy (Ctrl+C) → Paste below (Ctrl+V)
+                          </p>
+                          <textarea
+                            value={importText}
+                            onChange={(e) => {
+                              setImportText(e.target.value);
+                              if (e.target.value) handleSpreadsheetPaste(e.target.value);
+                            }}
+                            placeholder="Paste player stats table here..."
+                            className="w-full border rounded px-3 py-2 font-mono text-xs mb-3"
+                            rows="3"
+                          />
+                          
+                          {spreadsheetData.length > 0 && (
+                            <div className="border rounded overflow-auto" style={{ maxHeight: '400px' }}>
+                              <table className="w-full text-xs">
+                                <thead className="bg-gray-100 sticky top-0">
+                                  <tr>
+                                    {spreadsheetHeaders.map((header, idx) => (
+                                      <th key={idx} className="border px-2 py-1 text-left font-semibold">
+                                        {header}
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {spreadsheetData.map((row, rowIdx) => (
+                                    <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                      {row.map((cell, cellIdx) => (
+                                        <td key={cellIdx} className="border px-2 py-1">
+                                          {cell}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div>
@@ -1208,61 +1939,219 @@ for (let i = 0; i < lines.length; i++) {
                 </div>
               </div>
 
-              <div className="print-page-1 bg-white p-4 max-w-7xl mx-auto">
-                <div className="rounded-lg p-3 mb-3" style={{ 
-                  background: `linear-gradient(135deg, ${myTeamSetup.colors.primary}20 0%, ${myTeamSetup.colors.secondary}20 100%)`,
-                  border: `3px solid ${myTeamSetup.colors.primary}`
+              <div className="print-page-1 bg-white p-1 max-w-7xl mx-auto">
+                {/* New 3-Column Header */}
+                <div className="rounded-lg overflow-hidden mb-1" style={{ 
+                  background: `linear-gradient(to right, ${myTeamSetup.colors.primary}15 0%, white 40%, white 60%, ${opponentColors.primary}15 100%)`,
+                  border: `2px solid black`
                 }}>
-                  {/* Logos and Coaches Row */}
-                  <div className="flex justify-between items-center mb-3 px-4">
-                    {/* My Team Logo and Coach */}
-                    <div className="text-center">
-                      {myTeamSetup.logo && <img src={myTeamSetup.logo} alt="Team" className="h-20 w-20 object-contain mx-auto mb-1" />}
-                      <div className="text-sm font-bold">{myTeamData.headCoach.name}</div>
-                      <div className="text-xs text-gray-600">(Career: {totalCoachRecord.w}-{totalCoachRecord.l}-{totalCoachRecord.t})</div>
+                  <div className="grid grid-cols-[30%_40%_30%] gap-0 p-2">
+                    {/* LEFT COLUMN - MY TEAM (30%) */}
+                    <div className="flex flex-col items-center text-center space-y-1">
+                      {/* Logo */}
+                      {myTeamSetup.logo && (
+                        <img src={myTeamSetup.logo} alt="Team" className="h-12 w-12 object-contain" style={{ border: `2px solid ${myTeamSetup.colors.primary}` }} />
+                      )}
+                      
+                      {/* Head Coach */}
+                      <div>
+                        <div style={{ fontSize: '8px' }} className="font-semibold text-gray-600">Head Coach</div>
+                        <div style={{ fontSize: '10px' }} className="font-bold">{myTeamData.headCoach.name}</div>
+                        <div style={{ fontSize: '7px' }} className="text-gray-600">(Career: {totalCoachRecord.w}-{totalCoachRecord.l}-{totalCoachRecord.t})</div>
+                      </div>
+                      
+                      {/* Last Game */}
+                      <div className="w-full">
+                        <div style={{ fontSize: '8px' }} className="font-semibold text-gray-600 uppercase mb-0">Last Game</div>
+                        {myTeamData.lastGame ? (
+                          <>
+                            <div style={{ fontSize: '9px' }} className="font-bold">
+                              {myTeamData.teamName} <span className={`font-black ${
+                                myTeamData.lastGame.result === 'W' ? 'text-green-600' :
+                                myTeamData.lastGame.result === 'L' ? 'text-red-600' :
+                                'text-gray-600'
+                              }`}>{myTeamData.lastGame.ourScore} - {myTeamData.lastGame.oppScore}</span> {myTeamData.lastGame.opponent}
+                            </div>
+                            <div style={{ fontSize: '7px' }} className="text-gray-500">{myTeamData.lastGame.date}</div>
+                          </>
+                        ) : (
+                          <div style={{ fontSize: '9px' }} className="text-gray-400">N/A</div>
+                        )}
+                      </div>
+                      
+                      {/* Next Game */}
+                      <div className="w-full">
+                        <div style={{ fontSize: '8px' }} className="font-semibold text-gray-600 uppercase mb-0">Next Game</div>
+                        {myTeamData.nextGame ? (
+                          <>
+                            <div style={{ fontSize: '9px' }} className="font-bold">{myTeamData.nextGame.isHome ? 'VS' : 'AT'} {myTeamData.nextGame.opponent || 'TBD'}</div>
+                            <div style={{ fontSize: '7px' }} className="text-gray-500">{myTeamData.nextGame.date} @ {myTeamData.nextGame.time}</div>
+                          </>
+                        ) : (
+                          <div style={{ fontSize: '9px' }} className="text-gray-400">TBD</div>
+                        )}
+                      </div>
+                      
+                      {/* Stats Row - 4 boxes horizontal */}
+                      <div className="flex gap-1 w-full justify-center">
+                        <div className="bg-white border border-gray-300 rounded p-1 flex-1" style={{ minWidth: '50px' }}>
+                          <div style={{ fontSize: '7px' }} className="font-semibold text-gray-700">Power Play</div>
+                          <div style={{ fontSize: '12px' }} className="font-bold" style={{ color: myTeamSetup.colors.primary }}>{myTeamData.stats.ppPct}%</div>
+                        </div>
+                        <div className="bg-white border border-gray-300 rounded p-1 flex-1" style={{ minWidth: '50px' }}>
+                          <div style={{ fontSize: '7px' }} className="font-semibold text-gray-700">Penalty Kill</div>
+                          <div style={{ fontSize: '12px' }} className="font-bold" style={{ color: myTeamSetup.colors.primary }}>{myTeamData.stats.pkPct}%</div>
+                        </div>
+                        <div className="bg-white border border-gray-300 rounded p-1 flex-1" style={{ minWidth: '50px' }}>
+                          <div style={{ fontSize: '7px' }} className="font-semibold text-gray-700">Goals/Game</div>
+                          <div className="text-lg font-bold" style={{ color: myTeamSetup.colors.primary }}>{myTeamData.stats.gpg.toFixed(2)}</div>
+                        </div>
+                        <div className="bg-white border border-gray-300 rounded p-2 flex-1 min-w-[70px]">
+                          <div className="text-xs font-semibold text-gray-700">GA/Game</div>
+                          <div className="text-lg font-bold" style={{ color: myTeamSetup.colors.primary }}>{myTeamData.stats.gapg.toFixed(2)}</div>
+                        </div>
+                      </div>
                     </div>
                     
-                    {/* Center - Game Number */}
-                    <div className="text-center flex-1 mx-4">
-                      <div className="text-xs font-semibold text-gray-600 mb-2">Game #{myTeamData.nextGame.gameNum}</div>
+                    {/* CENTER COLUMN - MATCHUP (40%) */}
+                    <div className="flex flex-col items-center justify-center text-center space-y-2 px-4">
+                      {/* Hand-written notes grid - Two separate grids side by side */}
+                      <div className="w-full flex gap-4 justify-center">
+                        {/* Left grid: 3 columns x 4 rows */}
+                        <div className="grid grid-cols-3 gap-0" style={{ 
+                          border: '1px solid #e5e7eb',
+                          width: '60px',
+                          height: '60px'
+                        }}>
+                          {[...Array(12)].map((_, i) => (
+                            <div key={i} style={{
+                              border: '1px solid #e5e7eb',
+                              borderTop: i < 3 ? 'none' : '1px solid #e5e7eb',
+                              borderLeft: i % 3 === 0 ? 'none' : '1px solid #e5e7eb',
+                              borderRight: i % 3 === 2 ? 'none' : '1px solid #e5e7eb',
+                              borderBottom: i >= 9 ? 'none' : '1px solid #e5e7eb'
+                            }}></div>
+                          ))}
+                        </div>
+                        
+                        {/* Right grid: 2 columns x 4 rows with G labels in bottom row */}
+                        <div className="grid grid-cols-2 gap-0" style={{ 
+                          border: '1px solid #e5e7eb',
+                          width: '40px',
+                          height: '60px'
+                        }}>
+                          {[...Array(8)].map((_, i) => (
+                            <div key={i} style={{
+                              border: '1px solid #e5e7eb',
+                              borderTop: i < 2 ? 'none' : '1px solid #e5e7eb',
+                              borderLeft: i % 2 === 0 ? 'none' : '1px solid #e5e7eb',
+                              borderRight: i % 2 === 1 ? 'none' : '1px solid #e5e7eb',
+                              borderBottom: i >= 6 ? 'none' : '1px solid #e5e7eb',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '8px',
+                              fontWeight: 'bold',
+                              color: '#666'
+                            }}>
+                              {i >= 6 ? 'G' : ''}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      {/* My Team */}
+                      <div style={{ fontSize: '16px', color: myTeamSetup.colors.primary }} className="font-black leading-tight">
+                        {myTeamSetup.teamName} {myTeamSetup.mascot ? myTeamSetup.mascot : ''}
+                      </div>
+                      <div style={{ fontSize: '8px' }} className="text-gray-700">
+                        ({myTeamData.record.w}-{myTeamData.record.l}-{myTeamData.record.t}, {myTeamData.section}, {myTeamData.conference})
+                      </div>
+                      
+                      <div style={{ fontSize: '10px' }} className="font-semibold text-gray-600">vs</div>
+                      
+                      {/* Opponent */}
+                      <div style={{ fontSize: '16px', color: opponentColors.primary }} className="font-black leading-tight">
+                        {opponentData.teamName} {opponentData.nickname ? opponentData.nickname : ''}
+                      </div>
+                      <div style={{ fontSize: '8px' }} className="text-gray-700">
+                        {opponentData.record.w ? `(${opponentData.record.w}-${opponentData.record.l}-${opponentData.record.t}, ${opponentData.section}, ${opponentData.conference})` : ''}
+                      </div>
+                      
+                      {/* Location */}
+                      {myTeamData.nextGame?.location && (
+                        <div style={{ fontSize: '7px' }} className="text-gray-500">{ myTeamData.nextGame.location}</div>
+                      )}
+                      
+                      {/* Game # at bottom */}
+                      <div style={{ fontSize: '10px' }} className="font-semibold text-gray-600">Game #{myTeamData.nextGame?.gameNum || (myTeamData.record.w + myTeamData.record.l + myTeamData.record.t + 1)}</div>
                     </div>
                     
-                    {/* Opponent Logo and Coach */}
-                    <div className="text-center">
-                      {opponentLogo && <img src={opponentLogo} alt="Opponent" className="h-20 w-20 object-contain mx-auto mb-1" />}
-                      <div className="text-sm font-bold">{opponentData.headCoach.name}</div>
-                      <div className="text-xs text-gray-600">(Career: {totalOppCoachRecord.w}-{totalOppCoachRecord.l}-{totalOppCoachRecord.t})</div>
-                    </div>
-                  </div>
-                  
-                  {/* Game Title */}
-                  <h1 className="text-xl font-black text-center mb-1" style={{ color: myTeamSetup.colors.secondary }}>
-                    {myTeamSetup.teamName} ({myTeamData.record.w}-{myTeamData.record.l}-{myTeamData.record.t}, {myTeamData.section}, {myTeamData.conference}) vs {opponentData.teamName ? `${opponentData.teamName} (${opponentData.record.w}-${opponentData.record.l}-${opponentData.record.t}, ${opponentData.section}, ${opponentData.conference})` : '(, , )'}
-                  </h1>
-                  
-                  {/* Game Location */}
-<div className="text-sm text-center mb-2">{myTeamData.nextGame.location}</div>
-                  
-                  <div className="grid grid-cols-4 gap-2 mt-2">
-                    <div className="bg-white rounded p-1 shadow-sm">
-                      <div className="text-xs font-semibold">Power Play</div>
-                      <div className="text-lg font-bold" style={{ color: myTeamSetup.colors.primary }}>{myTeamData.stats.ppPct}%</div>
-                      <div className="text-sm" style={{ color: opponentColors.primary }}>{opponentData.stats.ppPct}%</div>
-                    </div>
-                    <div className="bg-white rounded p-1 shadow-sm">
-                      <div className="text-xs font-semibold">Penalty Kill</div>
-                      <div className="text-lg font-bold" style={{ color: myTeamSetup.colors.primary }}>{myTeamData.stats.pkPct}%</div>
-                      <div className="text-sm" style={{ color: opponentColors.primary }}>{opponentData.stats.pkPct}%</div>
-                    </div>
-                    <div className="bg-white rounded p-1 shadow-sm">
-                      <div className="text-xs font-semibold">Goals/Game</div>
-                      <div className="text-lg font-bold" style={{ color: myTeamSetup.colors.primary }}>{myTeamData.stats.gpg.toFixed(2)}</div>
-                      <div className="text-sm" style={{ color: opponentColors.primary }}>{opponentData.stats.gpg.toFixed(2)}</div>
-                    </div>
-                    <div className="bg-white rounded p-1 shadow-sm">
-                      <div className="text-xs font-semibold">GA/Game</div>
-                      <div className="text-lg font-bold" style={{ color: myTeamSetup.colors.primary }}>{myTeamData.stats.gapg.toFixed(2)}</div>
-                      <div className="text-sm" style={{ color: opponentColors.primary }}>{opponentData.stats.gapg.toFixed(2)}</div>
+                    {/* RIGHT COLUMN - OPPONENT (30%) */}
+                    <div className="flex flex-col items-center text-center space-y-2">
+                      {/* Logo */}
+                      {opponentLogo && (
+                        <img src={opponentLogo} alt="Opponent" className="h-16 w-16 object-contain" style={{ border: `2px solid ${opponentColors.primary}` }} />
+                      )}
+                      
+                      {/* Head Coach */}
+                      <div>
+                        <div className="text-xs font-semibold text-gray-600">Head Coach</div>
+                        <div className="text-sm font-bold">{opponentData.headCoach.name}</div>
+                        <div className="text-xs text-gray-600">(Career: {totalOppCoachRecord.w}-{totalOppCoachRecord.l}-{totalOppCoachRecord.t})</div>
+                      </div>
+                      
+                      {/* Last Game */}
+                      <div className="w-full">
+                        <div className="text-xs font-semibold text-gray-600 uppercase mb-1">Last Game</div>
+                        {opponentData.lastGame ? (
+                          <>
+                            <div className="text-sm font-bold">
+                              {opponentData.teamName} <span className={`text-lg font-black ${
+                                opponentData.lastGame.result === 'W' ? 'text-green-600' :
+                                opponentData.lastGame.result === 'L' ? 'text-red-600' :
+                                'text-gray-600'
+                              }`}>{opponentData.lastGame.ourScore} - {opponentData.lastGame.oppScore}</span> {opponentData.lastGame.opponent}
+                            </div>
+                            <div className="text-xs text-gray-500">{opponentData.lastGame.date}</div>
+                          </>
+                        ) : (
+                          <div className="text-sm text-gray-400">N/A</div>
+                        )}
+                      </div>
+                      
+                      {/* Next Game */}
+                      <div className="w-full">
+                        <div className="text-xs font-semibold text-gray-600 uppercase mb-1">Next Game</div>
+                        {opponentData.nextGame ? (
+                          <>
+                            <div className="text-sm font-bold">{opponentData.nextGame.isHome ? 'VS' : 'AT'} {opponentData.nextGame.opponent || 'TBD'}</div>
+                            <div className="text-xs text-gray-500">{opponentData.nextGame.date} @ {opponentData.nextGame.time}</div>
+                          </>
+                        ) : (
+                          <div className="text-sm text-gray-400">TBD</div>
+                        )}
+                      </div>
+                      
+                      {/* Stats Row - 4 boxes horizontal */}
+                      <div className="flex gap-2 w-full justify-center">
+                        <div className="bg-white border border-gray-300 rounded p-2 flex-1 min-w-[70px]">
+                          <div className="text-xs font-semibold text-gray-700">Power Play</div>
+                          <div className="text-lg font-bold" style={{ color: opponentColors.primary }}>{opponentData.stats.ppPct}%</div>
+                        </div>
+                        <div className="bg-white border border-gray-300 rounded p-2 flex-1 min-w-[70px]">
+                          <div className="text-xs font-semibold text-gray-700">Penalty Kill</div>
+                          <div className="text-lg font-bold" style={{ color: opponentColors.primary }}>{opponentData.stats.pkPct}%</div>
+                        </div>
+                        <div className="bg-white border border-gray-300 rounded p-2 flex-1 min-w-[70px]">
+                          <div className="text-xs font-semibold text-gray-700">Goals/Game</div>
+                          <div className="text-lg font-bold" style={{ color: opponentColors.primary }}>{opponentData.stats.gpg.toFixed(2)}</div>
+                        </div>
+                        <div className="bg-white border border-gray-300 rounded p-2 flex-1 min-w-[70px]">
+                          <div className="text-xs font-semibold text-gray-700">GA/Game</div>
+                          <div className="text-lg font-bold" style={{ color: opponentColors.primary }}>{opponentData.stats.gapg.toFixed(2)}</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1277,11 +2166,10 @@ for (let i = 0; i < lines.length; i++) {
                 </div>
 
                 <div className="mb-3">
-                  <h2 className="text-lg font-bold mb-2">FORWARD LINES</h2>
+                  <h2 style={{ fontSize: '14px' }} className="font-bold mb-1">FORWARD LINES</h2>
                   {['line1', 'line2', 'line3', 'line4'].map((line, idx) => (
-                    <div key={line} className={`mb-2 rounded p-2 border-2 ${colorClasses[lines[line].color]}`}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-bold text-sm">Line {idx + 1}</span>
+                    <div key={line} className={`mb-1 rounded p-1 border-2 ${colorClasses[lines[line].color]}`}>
+                      <div className="flex items-center gap-2 mb-0">
                         <select
                           value={lines[line].color}
                           onChange={(e) => handleLineColorChange(line, e.target.value)}
@@ -1289,7 +2177,7 @@ for (let i = 0; i < lines.length; i++) {
                         >
                           {colorOptions.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
-                        <div className="flex-1 grid grid-cols-3 gap-2">
+                        <div className="flex-1 grid grid-cols-3 gap-1">
                           <LineSlot line={line} position="lw" label="LW" />
                           <LineSlot line={line} position="c" label="C" />
                           <LineSlot line={line} position="rw" label="RW" />
@@ -1299,13 +2187,12 @@ for (let i = 0; i < lines.length; i++) {
                   ))}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <h2 className="text-lg font-bold mb-2">DEFENSE PAIRS</h2>
+                    <h2 style={{ fontSize: '14px' }} className="font-bold mb-1">DEFENSE PAIRS</h2>
                     {['d1', 'd2', 'd3'].map((line, idx) => (
-                      <div key={line} className="mb-2 bg-gray-100 rounded p-2">
-                        <h3 className="font-bold text-sm mb-1">Pair {idx + 1}</h3>
-                        <div className="grid grid-cols-2 gap-2">
+                      <div key={line} className="mb-1 bg-gray-100 rounded p-1">
+                        <div className="grid grid-cols-2 gap-1">
                           <LineSlot line={line} position="ld" label="LD" />
                           <LineSlot line={line} position="rd" label="RD" />
                         </div>
@@ -1314,25 +2201,25 @@ for (let i = 0; i < lines.length; i++) {
                   </div>
 
                   <div>
-                    <h2 className="text-lg font-bold mb-2">GOALIES</h2>
-                    <div className="space-y-2 mb-3">
+                    <h2 style={{ fontSize: '14px' }} className="font-bold mb-1">GOALIES</h2>
+                    <div className="space-y-1 mb-2">
                       <LineSlot line="goalies" position="starter" label="Starter" />
                       <LineSlot line="goalies" position="backup" label="Backup" />
                     </div>
 
-                    <div className="bg-yellow-50 border-2 border-yellow-400 rounded p-2 mt-3">
-                      <h3 className="font-bold text-sm mb-1">Student Manager</h3>
+                    <div className="bg-yellow-50 border-2 border-yellow-400 rounded p-1 mt-2">
+                      <h3 style={{ fontSize: '11px' }} className="font-bold mb-1">Student Manager</h3>
                       <input
                         type="text"
                         value={myTeamData.studentManager}
                         onChange={(e) => setMyTeamData({...myTeamData, studentManager: e.target.value})}
                         placeholder="Name"
-                        className="w-full border rounded px-2 py-1 text-sm"
+                        className="w-full border rounded px-1 py-0.5 text-xs"
                       />
                     </div>
 
-                    <div className="bg-red-50 border-2 border-red-400 rounded p-2 mt-2">
-                      <h3 className="font-bold text-sm mb-1">Injured/Illness</h3>
+                    <div className="bg-red-50 border-2 border-red-400 rounded p-1 mt-1">
+                      <h3 style={{ fontSize: '11px' }} className="font-bold mb-1">Injured/Illness</h3>
                       <textarea
                         value={myTeamData.injuries.join('\n')}
                         onChange={(e) => setMyTeamData({...myTeamData, injuries: e.target.value.split('\n')})}
@@ -1344,25 +2231,27 @@ for (let i = 0; i < lines.length; i++) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 mt-3">
-                  <div className="border-2 rounded p-2" style={{ borderColor: myTeamSetup.colors.primary, background: `${myTeamSetup.colors.primary}10` }}>
-                    <h3 className="font-bold mb-1">Tigers PK</h3>
+                <div className="grid grid-cols-2 gap-1 mt-1">
+                  <div className="border-2 rounded p-1" style={{ borderColor: myTeamSetup.colors.primary, background: `${myTeamSetup.colors.primary}10` }}>
+                    <h3 style={{ fontSize: '10px' }} className="font-bold mb-0">Tigers PK</h3>
                     <textarea
                       value={coachNotes.pk}
                       onChange={(e) => setCoachNotes({...coachNotes, pk: e.target.value})}
                       placeholder="PK notes..."
-                      className="w-full border rounded px-2 py-1 text-sm"
-                      rows="3"
+                      className="w-full border rounded px-1 py-0.5"
+                      style={{ fontSize: '8px' }}
+                      rows="2"
                     />
                   </div>
-                  <div className="border-2 rounded p-2" style={{ borderColor: myTeamSetup.colors.primary, background: `${myTeamSetup.colors.primary}10` }}>
-                    <h3 className="font-bold mb-1">Tigers PP</h3>
+                  <div className="border-2 rounded p-1" style={{ borderColor: myTeamSetup.colors.primary, background: `${myTeamSetup.colors.primary}10` }}>
+                    <h3 style={{ fontSize: '10px' }} className="font-bold mb-0">Tigers PP</h3>
                     <textarea
                       value={coachNotes.pp}
                       onChange={(e) => setCoachNotes({...coachNotes, pp: e.target.value})}
                       placeholder="PP notes..."
-                      className="w-full border rounded px-2 py-1 text-sm"
-                      rows="3"
+                      className="w-full border rounded px-1 py-0.5"
+                      style={{ fontSize: '8px' }}
+                      rows="2"
                     />
                   </div>
                 </div>
@@ -1513,83 +2402,68 @@ for (let i = 0; i < lines.length; i++) {
                   </div>
                 </div>
 
-                <div className="mt-3 mb-3">
-                  <h2 className="text-xl font-bold mb-2" style={{ color: opponentColors.primary }}>Diagrams & Notes</h2>
+                <div className="mt-2">
+                  <h2 style={{ fontSize: '14px', color: opponentColors.primary }} className="font-bold mb-1">Diagrams & Notes</h2>
                   
-                  <div className="border-2 border-dashed border-gray-400 rounded p-3 mb-2 bg-gray-50 min-h-[200px]">
-                    <h3 className="font-bold text-sm mb-1">Large Diagram Area</h3>
-                    <div className="text-xs text-gray-500 italic">Paste image or add diagram here</div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 mb-3">
-                    <div className="border-2 border-dashed border-gray-400 rounded p-2 bg-gray-50 min-h-[150px]">
-                      <div className="text-xs text-gray-500 italic">Image 1</div>
-                    </div>
-                    <div className="border-2 border-dashed border-gray-400 rounded p-2 bg-gray-50 min-h-[150px]">
-                      <div className="text-xs text-gray-500 italic">Image 2</div>
-                    </div>
-                    <div className="border-2 border-dashed border-gray-400 rounded p-2 bg-gray-50 min-h-[150px]">
-                      <div className="text-xs text-gray-500 italic">Image 3</div>
-                    </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    {['image1', 'image2', 'image3'].map((key, idx) => (
+                      <div key={key} className="border-2 border-dashed border-gray-400 rounded p-1 bg-gray-50" style={{ minHeight: '100px', position: 'relative' }}>
+                        {diagramImages[key] ? (
+                          <div className="relative w-full h-full">
+                            <img src={diagramImages[key]} alt={`Diagram ${idx + 1}`} className="w-full h-full object-contain" />
+                            <button
+                              onClick={() => setDiagramImages({...diagramImages, [key]: null})}
+                              className="no-print absolute top-0 right-0 bg-red-500 text-white text-xs px-1 rounded"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ) : (
+                          <div>
+                            <div style={{ fontSize: '8px' }} className="text-gray-500 italic mb-1">Image {idx + 1}</div>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (event) => {
+                                    setDiagramImages({...diagramImages, [key]: event.target.result});
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                              className="no-print w-full text-xs"
+                            />
+                            <div 
+                              style={{ fontSize: '7px', minHeight: '40px' }} 
+                              className="text-gray-400 border-dashed border border-gray-300 rounded mt-1 p-1"
+                              contentEditable
+                              onPaste={(e) => {
+                                const items = e.clipboardData.items;
+                                for (let i = 0; i < items.length; i++) {
+                                  if (items[i].type.indexOf('image') !== -1) {
+                                    e.preventDefault();
+                                    const blob = items[i].getAsFile();
+                                    const reader = new FileReader();
+                                    reader.onload = (event) => {
+                                      setDiagramImages({...diagramImages, [key]: event.target.result});
+                                    };
+                                    reader.readAsDataURL(blob);
+                                    break;
+                                  }
+                                }
+                              }}
+                            >
+                              Paste image or type notes...
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
-
-                {coachNotes.showScoutNotes && (
-                  <div className="mt-3">
-                    <div className="flex justify-between items-center mb-2">
-                      <h2 className="text-xl font-bold" style={{ color: opponentColors.primary }}>Scouting Notes</h2>
-                      <button
-                        onClick={() => setCoachNotes({...coachNotes, showScoutNotes: false})}
-                        className="no-print text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600"
-                      >
-                        Hide Notes
-                      </button>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="border-2 border-dashed border-gray-400 rounded p-3 bg-gray-50">
-                        <h3 className="font-bold text-sm mb-2">Power Play Setup</h3>
-                        <textarea
-                          value={coachNotes.scoutNotes.powerPlay}
-                          onChange={(e) => setCoachNotes({...coachNotes, scoutNotes: {...coachNotes.scoutNotes, powerPlay: e.target.value}})}
-                          placeholder="PP scouting notes..."
-                          className="w-full border rounded px-2 py-1 text-xs"
-                          rows="6"
-                        />
-                      </div>
-                      <div className="border-2 border-dashed border-gray-400 rounded p-3 bg-gray-50">
-                        <h3 className="font-bold text-sm mb-2">Penalty Kill Setup</h3>
-                        <textarea
-                          value={coachNotes.scoutNotes.penaltyKill}
-                          onChange={(e) => setCoachNotes({...coachNotes, scoutNotes: {...coachNotes.scoutNotes, penaltyKill: e.target.value}})}
-                          placeholder="PK scouting notes..."
-                          className="w-full border rounded px-2 py-1 text-xs"
-                          rows="6"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="border-2 border-dashed border-gray-400 rounded p-3 bg-gray-50 mt-3">
-                      <h3 className="font-bold text-sm mb-2">Key Players & Tendencies</h3>
-                      <textarea
-                        value={coachNotes.scoutNotes.keyPlayers}
-                        onChange={(e) => setCoachNotes({...coachNotes, scoutNotes: {...coachNotes.scoutNotes, keyPlayers: e.target.value}})}
-                        placeholder="Key player notes, tendencies, matchups..."
-                        className="w-full border rounded px-2 py-1 text-xs"
-                        rows="6"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {!coachNotes.showScoutNotes && (
-                  <button
-                    onClick={() => setCoachNotes({...coachNotes, showScoutNotes: true})}
-                    className="no-print mt-3 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                  >
-                    Show Scouting Notes
-                  </button>
-                )}
               </div>
 
               <style>{`
@@ -1605,7 +2479,8 @@ for (let i = 0; i < lines.length; i++) {
                   
                   .print-page-1, .print-page-2 {
                     page-break-after: always;
-                    margin: 0.25in;
+                    margin: 0;
+                    padding: 0.1in;
                   }
                   
                   .print-page-2 {
@@ -1614,7 +2489,7 @@ for (let i = 0; i < lines.length; i++) {
                   
                   @page {
                     size: portrait;
-                    margin: 0.25in;
+                    margin: 0.1in;
                   }
                 }
                 
