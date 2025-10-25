@@ -1444,6 +1444,7 @@ const handleSaveAndClose = () => {
             const cardRef = React.useRef(null);
             const numberRef = React.useRef(null);
             const nameRef = React.useRef(null);
+            const pronunciationRef = React.useRef(null);
             
             // Look up pronunciation from myTeamSetup.pronunciations using player's last name
             const pronunciation = myTeamSetup.pronunciations[player.lastName] || '';
@@ -1489,7 +1490,7 @@ const handleSaveAndClose = () => {
             // For preview cards, use 0.3125 of normal size (was 0.25, increased by 25%)
             const fontScale = isPreview ? 0.3125 : 1;
             const statFontSize = `${8 * fontScale}pt`; // Same for all positions
-            const nameFontSize = `${48 * fontScale}pt`; // 48pt for both goalies and skaters
+            const nameFontSize = `${30 * fontScale}pt`; // 30pt for both goalies and skaters
             const infoFontSize = statFontSize; // handed, grade same as stats
             const pronunciationFontSize = `${10 * fontScale}pt`;
             
@@ -1518,12 +1519,19 @@ const handleSaveAndClose = () => {
               
               // Resize player name - be more conservative to ensure it shows
               if (nameRef.current) {
-                const baseMaxSize = 48; // Now 48pt for both goalies and skaters
+                const baseMaxSize = 30; // Now 30pt for both goalies and skaters
                 const maxNameSize = isPreview ? baseMaxSize * 0.3125 : baseMaxSize;
                 const minNameSize = isPreview ? 3.125 : 10; // 10 * 0.3125 = 3.125
                 resizeText(nameRef.current, maxNameSize, minNameSize);
               }
-            }, [player.number, player.name, isGoalie, isPreview]);
+              
+              // Resize pronunciation to fit on one line
+              if (pronunciationRef.current && pronunciation) {
+                const maxPronunciationSize = isPreview ? 10 * 0.3125 : 10; // 10pt base
+                const minPronunciationSize = isPreview ? 2 : 6; // Min 6pt to stay readable
+                resizeText(pronunciationRef.current, maxPronunciationSize, minPronunciationSize);
+              }
+            }, [player.number, player.name, pronunciation, isGoalie, isPreview]);
             
             return (
               <div
@@ -1568,13 +1576,18 @@ const handleSaveAndClose = () => {
                   
                   {/* Pronunciation - 10pt italic */}
                   {pronunciation && (
-                    <div style={{ 
-                      fontSize: pronunciationFontSize,
-                      fontStyle: 'italic',
-                      lineHeight: '1',
-                      textAlign: 'center',
-                      marginTop: '1px'
-                    }}>
+                    <div 
+                      ref={pronunciationRef}
+                      style={{ 
+                        fontSize: pronunciationFontSize,
+                        fontStyle: 'italic',
+                        lineHeight: '1',
+                        textAlign: 'center',
+                        marginTop: '1px',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        width: '100%'
+                      }}>
                       "{pronunciation}"
                     </div>
                   )}
@@ -1588,7 +1601,7 @@ const handleSaveAndClose = () => {
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'flex-start',
-                  gap: '0px'
+                  gap: '1px'
                 }}>
                   {/* Player Name - 2x stat size, BOLD, centered, NO WRAP */}
                   <div 
@@ -2755,7 +2768,7 @@ const handleSaveAndClose = () => {
                         background: `${myTeamSetup.colors.primary}10`,
                         padding: '3px'
                       }}>
-                        <div style={{ fontSize: '9px' }} className="font-bold text-center mb-0">Tigers Penalty Kill</div>
+                        <div style={{ fontSize: '9px' }} className="font-bold text-center mb-0">{myTeamData.nickname} Penalty Kill</div>
                         <div className="flex-1 flex flex-col justify-around" style={{ fontSize: '9px', lineHeight: '1.1' }}>
                           <input 
                             type="text" 
@@ -2826,7 +2839,7 @@ const handleSaveAndClose = () => {
                         background: `${myTeamSetup.colors.primary}10`,
                         padding: '3px'
                       }}>
-                        <div style={{ fontSize: '9px' }} className="font-bold text-center mb-0">Tigers Power Play</div>
+                        <div style={{ fontSize: '9px' }} className="font-bold text-center mb-0">{myTeamData.nickname} Power Play</div>
                         <div className="flex-1 flex flex-col justify-around" style={{ fontSize: '9px', lineHeight: '1.1' }}>
                           <input 
                             type="text" 
