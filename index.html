@@ -339,9 +339,8 @@
             console.log('=== Parsing spreadsheet paste ===');
             console.log('Raw text length:', text.length);
             
-            const lines = text.split('
-').filter(l => l.trim());
-            const rows = lines.map(line => line.split('	'));
+            const lines = text.split('\n').filter(l => l.trim());
+            const rows = lines.map(line => line.split('\t'));
             
             if (rows.length > 0) {
               setSpreadsheetHeaders(rows[0]);
@@ -471,8 +470,7 @@
           // Parsing Functions
           const parseHomePage = (text) => {
             try {
-              const lines = text.split('
-').map(l => l.trim()).filter(l => l);
+              const lines = text.split('\n').map(l => l.trim()).filter(l => l);
               let teamName = '';
               let nickname = '';
               let record = { w: 0, l: 0, t: 0 };
