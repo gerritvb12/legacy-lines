@@ -43,6 +43,40 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
+        // Error Boundary Component
+        class ErrorBoundary extends React.Component {
+          constructor(props) {
+            super(props);
+            this.state = { hasError: false, error: null };
+          }
+
+          static getDerivedStateFromError(error) {
+            return { hasError: true, error };
+          }
+
+          componentDidCatch(error, errorInfo) {
+            console.error('Error caught by boundary:', error, errorInfo);
+          }
+
+          render() {
+            if (this.state.hasError) {
+              return (
+                <div style={{ padding: '20px', backgroundColor: '#fee', border: '2px solid #f00', margin: '20px' }}>
+                  <h2>Something went wrong.</h2>
+                  <details style={{ whiteSpace: 'pre-wrap' }}>
+                    {this.state.error && this.state.error.toString()}
+                  </details>
+                  <button onClick={() => window.location.reload()} style={{ marginTop: '10px', padding: '8px 16px' }}>
+                    Reload Application
+                  </button>
+                </div>
+              );
+            }
+            return this.props.children;
+          }
+        }
+
+        // SVG Icon Components
         const Upload = ({ size = 16 }) => (
             <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
@@ -73,12 +107,12 @@
             logo: null,
             colors: { primary: '#fb923c', secondary: '#1f2937' },
             arena: 'Delano Area Sports Arena, Delano',
-            careerStats: {}, // Will store career totals by player ID
-            pronunciations: {}, // lastName: pronunciation mapping
+            careerStats: {},
+            pronunciations: {},
             careerSeasonData: {
-              season1: '', // 2024-25 (current/most recent)
-              season2: '', // 2023-24
-              season3: ''  // 2022-23
+              season1: '',
+              season2: '',
+              season3: ''
             }
           });
 
@@ -146,14 +180,44 @@
           const [importText, setImportText] = useState('');
           const [spreadsheetData, setSpreadsheetData] = useState([]);
           const [spreadsheetHeaders, setSpreadsheetHeaders] = useState([]);
-          
+          const [selectedPlayer, setSelectedPlayer] = useState(null);
+          const [opponentLogo, setOpponentLogo] = useState(null);
+          const [opponentColors, setOpponentColors] = useState({ primary: '#dc2626', secondary: '#991b1b' });
+          const [careerStatsImport, setCareerStatsImport] = useState({
+            lastSeason: '',
+            twoSeasonsAgo: '',
+            threeSeasonsAgo: ''
+          });
+
+          const colorOptions = ['GREEN', 'RED', 'BLUE', 'YELLOW', 'WHITE', 'BLACK', 'DARK GRAY', 'LIGHT GRAY'];
+          const colorClasses = {
+            'GREEN': 'bg-green-100 border-green-600',
+            'RED': 'bg-red-100 border-red-600',
+            'BLUE': 'bg-blue-100 border-blue-600',
+            'YELLOW': 'bg-yellow-100 border-yellow-600',
+            'WHITE': 'bg-white border-gray-800',
+            'BLACK': 'bg-gray-900 border-gray-900',
+            'DARK GRAY': 'bg-gray-600 border-gray-800',
+            'LIGHT GRAY': 'bg-gray-200 border-gray-500'
+          };
+
+          const importSteps = [
+            { key: 'myTeamHome', label: 'My Team - Legacy Home', team: 'mine' },
+            { key: 'myTeamRoster', label: 'My Team - Legacy Roster', team: 'mine' },
+            { key: 'myTeamPlayerStats', label: 'My Team - Legacy Player Stats', team: 'mine' },
+            { key: 'oppLogo', label: 'Opponent - Logo', team: 'opponent', isLogo: true },
+            { key: 'oppHome', label: 'Opponent - Legacy Home', team: 'opponent' },
+            { key: 'oppRoster', label: 'Opponent - Legacy Roster', team: 'opponent' },
+            { key: 'oppPlayerStats', label: 'Opponent - Legacy Player Stats', team: 'opponent' }
+          ];
+
           // Help content for different sections
           const helpContents = {
             careerStats: {
               title: 'How to Import Career Stats',
               steps: [
                 'Navigate to Legacy Hockey website',
-                'Go to your team\\'s "Player Stats" page for the {season} season',
+                'Go to your team's "Player Stats" page for the {season} season',
                 'Press Ctrl+A (Windows) or Command+A (Mac) to select all content',
                 'Press Ctrl+C (Windows) or Command+C (Mac) to copy',
                 'Return to Legacy Lines and paste here with Ctrl+V (Windows) or Command+V (Mac)'
@@ -163,7 +227,7 @@
               title: 'How to Import Home Page Data',
               steps: [
                 'Navigate to Legacy Hockey website',
-                'Go to YOUR team\\'s "Home" page',
+                'Go to YOUR team's "Home" page',
                 'Select all content (Ctrl+A or Command+A)',
                 'Copy (Ctrl+C or Command+C)',
                 'Return here and paste (Ctrl+V or Command+V)'
@@ -172,7 +236,7 @@
             myTeamRoster: {
               title: 'How to Import Roster',
               steps: [
-                'Go to your team\\'s "Roster" page on Legacy Hockey',
+                'Go to your team's "Roster" page on Legacy Hockey',
                 'Select all content (Ctrl+A or Command+A)',
                 'Copy (Ctrl+C or Command+C)',
                 'Return here and paste (Ctrl+V or Command+V)'
@@ -181,7 +245,7 @@
             myTeamPlayerStats: {
               title: 'How to Import Player Stats',
               steps: [
-                'Go to your team\\'s "Player Stats" page on Legacy Hockey',
+                'Go to your team's "Player Stats" page on Legacy Hockey',
                 'Select all content (Ctrl+A or Command+A)',
                 'Copy (Ctrl+C or Command+C)',
                 'Return here and paste (Ctrl+V or Command+V)'
@@ -191,7 +255,7 @@
               title: 'How to Import Opponent Home Page Data',
               steps: [
                 'Navigate to Legacy Hockey website',
-                'Go to OPPONENT\\'S team "Home" page',
+                'Go to OPPONENT'S team "Home" page',
                 'Select all content (Ctrl+A or Command+A)',
                 'Copy (Ctrl+C or Command+C)',
                 'Return here and paste (Ctrl+V or Command+V)'
@@ -200,7 +264,7 @@
             oppRoster: {
               title: 'How to Import Opponent Roster',
               steps: [
-                'Go to opponent\\'s team "Roster" page on Legacy Hockey',
+                'Go to opponent's team "Roster" page on Legacy Hockey',
                 'Select all content (Ctrl+A or Command+A)',
                 'Copy (Ctrl+C or Command+C)',
                 'Return here and paste (Ctrl+V or Command+V)'
@@ -209,14 +273,36 @@
             oppPlayerStats: {
               title: 'How to Import Opponent Player Stats',
               steps: [
-                'Go to opponent\\'s team "Player Stats" page on Legacy Hockey',
+                'Go to opponent's team "Player Stats" page on Legacy Hockey',
                 'Select all content (Ctrl+A or Command+A)',
                 'Copy (Ctrl+C or Command+C)',
                 'Return here and paste (Ctrl+V or Command+V)'
               ]
             }
           };
-          
+
+          // Load saved setup on mount
+          useEffect(() => {
+            try {
+              const saved = localStorage.getItem('myTeamSetup');
+              if (saved) {
+                setMyTeamSetup(JSON.parse(saved));
+              }
+            } catch (error) {
+              console.error('Error loading saved setup:', error);
+            }
+          }, []);
+
+          // Save setup to localStorage whenever it changes
+          useEffect(() => {
+            try {
+              localStorage.setItem('myTeamSetup', JSON.stringify(myTeamSetup));
+            } catch (error) {
+              console.error('Error saving setup:', error);
+            }
+          }, [myTeamSetup]);
+
+          // Helper Functions
           const openHelp = (type, season = '') => {
             let content = { ...helpContents[type] };
             if (season) {
@@ -225,24 +311,16 @@
             setHelpContent(content);
             setShowHelp(true);
           };
-          
-          // Calculate season years dynamically - updates on June 1st each year
+
           const getSeasonYears = () => {
             const now = new Date();
-            const currentYear = now.getFullYear(); // 2025
-            const currentMonth = now.getMonth(); // 0-11 (0 = January, 5 = June)
-            
-            // We want to show 2024-2025 until June 1, 2026
-            // Current date: October 24, 2025
-            // Logic: Always show the season that STARTED in the previous calendar year
-            // until June 1st of the FOLLOWING year
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth();
             
             let seasonStartYear;
-            if (currentMonth >= 5) { // June (5) or later
-              // On/after June 1st, use PREVIOUS year as the season start
+            if (currentMonth >= 5) {
               seasonStartYear = currentYear - 1;
             } else {
-              // Before June, use TWO years back as the season start
               seasonStartYear = currentYear - 2;
             }
             
@@ -252,37 +330,26 @@
               season3: `${seasonStartYear - 2}-${seasonStartYear - 1}`
             };
           };
-          
-          // Determine if current step should use spreadsheet view
+
           const isSpreadsheetStep = (step) => {
-            return false; // Disabled - using simple text import for all
+            return false;
           };
-          
-          // Parse pasted spreadsheet data
+
           const handleSpreadsheetPaste = (text) => {
             console.log('=== Parsing spreadsheet paste ===');
             console.log('Raw text length:', text.length);
-            console.log('First 200 chars:', text.substring(0, 200));
             
-            const lines = text.split('\\n').filter(l => l.trim());
-            console.log('Total lines:', lines.length);
-            console.log('First line:', lines[0]);
-            
-            const rows = lines.map(line => line.split('\\t'));
-            console.log('First row split by tabs:', rows[0]);
-            console.log('First row length:', rows[0].length);
+            const lines = text.split('
+').filter(l => l.trim());
+            const rows = lines.map(line => line.split('	'));
             
             if (rows.length > 0) {
-              setSpreadsheetHeaders(rows[0]); // First row is headers
-              setSpreadsheetData(rows.slice(1)); // Rest is data
-              console.log('Set headers:', rows[0]);
-              console.log('Set data rows:', rows.length - 1);
+              setSpreadsheetHeaders(rows[0]);
+              setSpreadsheetData(rows.slice(1));
             }
           };
-          
-          // Process spreadsheet data into player stats
+
           const processSpreadsheetStats = (headers, data, existingRoster) => {
-            // Find column indices
             const getColIndex = (possibleNames) => {
               return headers.findIndex(h => possibleNames.some(name => 
                 h.toLowerCase().includes(name.toLowerCase())
@@ -304,9 +371,7 @@
             const fowCol = getColIndex(['fow']);
             const folCol = getColIndex(['fol']);
             
-            // Update roster with stats
             const updatedRoster = existingRoster.map(player => {
-              // Find matching row by name or number
               const matchingRow = data.find(row => {
                 const rowName = nameCol >= 0 ? row[nameCol] : '';
                 const rowNum = numCol >= 0 ? row[numCol] : '';
@@ -338,994 +403,713 @@
             
             return updatedRoster;
           };
-          
-          const [selectedPlayer, setSelectedPlayer] = useState(null);
-          const [opponentLogo, setOpponentLogo] = useState(null);
-          const [opponentColors, setOpponentColors] = useState({ primary: '#dc2626', secondary: '#991b1b' });
-          const [careerStatsImport, setCareerStatsImport] = useState({
-            lastSeason: '',
-            twoSeasonsAgo: '',
-            threeSeasonsAgo: ''
-          });
-
-          const colorOptions = ['GREEN', 'RED', 'BLUE', 'YELLOW', 'WHITE', 'BLACK', 'DARK GRAY', 'LIGHT GRAY'];
-          const colorClasses = {
-            'GREEN': 'bg-green-100 border-green-600',
-            'RED': 'bg-red-100 border-red-600',
-            'BLUE': 'bg-blue-100 border-blue-600',
-            'YELLOW': 'bg-yellow-100 border-yellow-600',
-            'WHITE': 'bg-white border-gray-800',
-            'BLACK': 'bg-gray-900 border-gray-900',
-            'DARK GRAY': 'bg-gray-600 border-gray-800',
-            'LIGHT GRAY': 'bg-gray-200 border-gray-500'
-          };
-
-          const importSteps = [
-  { key: 'myTeamHome', label: 'My Team - Legacy Home', team: 'mine' },
-  { key: 'myTeamRoster', label: 'My Team - Legacy Roster', team: 'mine' },
-  { key: 'myTeamPlayerStats', label: 'My Team - Legacy Player Stats', team: 'mine' },
-  { key: 'oppLogo', label: 'Opponent - Logo', team: 'opponent', isLogo: true },
-  { key: 'oppHome', label: 'Opponent - Legacy Home', team: 'opponent' },
-  { key: 'oppRoster', label: 'Opponent - Legacy Roster', team: 'opponent' },
-  { key: 'oppPlayerStats', label: 'Opponent - Legacy Player Stats', team: 'opponent' }
-];
-
-          useEffect(() => {
-            const saved = localStorage.getItem('myTeamSetup');
-            if (saved) {
-              setMyTeamSetup(JSON.parse(saved));
-            }
-          }, []);
-
-          useEffect(() => {
-            localStorage.setItem('myTeamSetup', JSON.stringify(myTeamSetup));
-          }, [myTeamSetup]);
 
           // Career Stats localStorage helpers
           const saveCareerStatsToStorage = (roster) => {
-            const careerData = {};
-            roster.forEach(player => {
-              const key = `${player.lastName?.toUpperCase()}_${player.firstName?.charAt(0)?.toUpperCase()}`;
+            try {
+              const careerData = {};
+              roster.forEach(player => {
+                const key = `${player.lastName?.toUpperCase()}_${player.firstName?.charAt(0)?.toUpperCase()}`;
+                
+                if (player.baseCareerStats && player.baseCareerStats.gp > 0) {
+                  careerData[key] = {
+                    type: 'skater',
+                    data: player.baseCareerStats
+                  };
+                }
+                
+                if (player.baseCareerGoalieStats && player.baseCareerGoalieStats.gp > 0) {
+                  careerData[key] = {
+                    type: 'goalie',
+                    data: player.baseCareerGoalieStats
+                  };
+                }
+              });
               
-              if (player.baseCareerStats && player.baseCareerStats.gp > 0) {
-                careerData[key] = {
-                  type: 'skater',
-                  data: player.baseCareerStats
-                };
-              }
-              
-              if (player.baseCareerGoalieStats && player.baseCareerGoalieStats.gp > 0) {
-                careerData[key] = {
-                  type: 'goalie',
-                  data: player.baseCareerGoalieStats
-                };
-              }
-            });
-            
-            localStorage.setItem('hockey-scout-career-stats', JSON.stringify(careerData));
-            console.log('
- \u56510 
-  Saved career stats to localStorage:', Object.keys(careerData).length, 'players');
+              localStorage.setItem('hockey-scout-career-stats', JSON.stringify(careerData));
+              console.log('💾 Saved career stats to localStorage:', Object.keys(careerData).length, 'players');
+            } catch (error) {
+              console.error('Error saving career stats:', error);
+            }
           };
           
           const loadCareerStatsFromStorage = (roster) => {
-            console.log('
- \u56589 
-  loadCareerStatsFromStorage CALLED with roster size:', roster.length);
-            const stored = localStorage.getItem('hockey-scout-career-stats');
-            console.log('
- \u56589 
-  localStorage contains:', stored ? 'YES' : 'NO');
-            
-            if (!stored) {
-              console.log('
- No career stats in localStorage');
+            try {
+              console.log('🔍 loadCareerStatsFromStorage CALLED with roster size:', roster.length);
+              const stored = localStorage.getItem('hockey-scout-career-stats');
+              
+              if (!stored) {
+                console.log('ℹ No career stats in localStorage');
+                return roster;
+              }
+              
+              const careerData = JSON.parse(stored);
+              console.log('📂 Loading career stats from localStorage:', Object.keys(careerData).length, 'players');
+              
+              return roster.map(player => {
+                const key = `${player.lastName?.toUpperCase()}_${player.firstName?.charAt(0)?.toUpperCase()}`;
+                const savedCareer = careerData[key];
+                
+                if (savedCareer) {
+                  if (player.position === 'G' && savedCareer.type === 'goalie') {
+                    player.baseCareerGoalieStats = savedCareer.data;
+                    console.log(`✓ Loaded GOALIE career for ${player.name}`);
+                  } else if (savedCareer.type === 'skater') {
+                    player.baseCareerStats = savedCareer.data;
+                    console.log(`✓ Loaded SKATER career for ${player.name}`);
+                  }
+                }
+                
+                return player;
+              });
+            } catch (error) {
+              console.error('Error loading career stats:', error);
               return roster;
             }
-            
-            const careerData = JSON.parse(stored);
-            console.log('
- \u56514 
-  Loading career stats from localStorage:', Object.keys(careerData).length, 'players');
-            console.log('
- \u56514 
-  Career data keys:', Object.keys(careerData));
-            
-            return roster.map(player => {
-              const key = `${player.lastName?.toUpperCase()}_${player.firstName?.charAt(0)?.toUpperCase()}`;
-              console.log(`
- \u56589 
-  Looking for key: ${key} for player: ${player.name} (Position: ${player.position})`);
-              const savedCareer = careerData[key];
-              
-              if (savedCareer) {
-                console.log(`
- Found saved career for ${player.name}:`, savedCareer);
-                
-                // If player is a goalie in the roster, load goalie stats
-                if (player.position === 'G' && savedCareer.type === 'goalie') {
-                  player.baseCareerGoalieStats = savedCareer.data;
-                  console.log(`
- Loaded GOALIE career for ${player.name}`);
-                } else if (savedCareer.type === 'skater') {
-                  player.baseCareerStats = savedCareer.data;
-                  console.log(`
- Loaded SKATER career for ${player.name}`);
-                }
-              } else {
-                console.log(`
- No saved career found for ${player.name} (key: ${key})`);
-              }
-              
-              return player;
-            });
           };
 
+          // Parsing Functions
           const parseHomePage = (text) => {
-            const lines = text.split('\\n').map(l => l.trim()).filter(l => l);
-            let teamName = '';
-            let nickname = '';
-            let record = { w: 0, l: 0, t: 0 };
-            let section = '';
-            let conference = '';
-            let headCoach = { name: '', careerRecord: { w: 0, l: 0, t: 0 }, seasonRecord: { w: 0, l: 0, t: 0 } };
-            
-            console.log('📋 ========== PARSING HOME PAGE ==========');
-            console.log('📋 Total lines:', lines.length);
-            console.log('📋 First 20 lines:', lines.slice(0, 20));
-            
-            // Find team name - look for line that appears between "Subscribe" and "History"
-            // This works for both logged in and not logged in states
-            const subscribeIdx = lines.findIndex(l => l === 'Subscribe');
-            const historyIdx = lines.findIndex(l => l === 'History');
-            console.log('📋 Subscribe index:', subscribeIdx, 'History index:', historyIdx);
-            if (subscribeIdx >= 0 && historyIdx > subscribeIdx && historyIdx - subscribeIdx <= 3) {
-              teamName = lines[subscribeIdx + 1];
-              console.log('✅ Found team name:', teamName);
-            }
-            
-            // Find nickname - look for "Nickname:" line
-            const nicknameIdx = lines.findIndex(l => l.startsWith('Nickname:'));
-            if (nicknameIdx >= 0) {
-              nickname = lines[nicknameIdx].split(':')[1]?.trim() || '';
-              console.log('✅ Found nickname:', nickname);
-            }
-            
-            // Look for the team record line - format: "15 11 1" or "0 0 0" (W L T)
-            console.log('📋 Looking for team record...');
-            for (let i = 0; i < lines.length; i++) {
-              // Look for "Team Record" header or "W L T" header
-              if (lines[i].includes('Team Record') || lines[i] === 'W L T') {
-                console.log('📋 Found record header at line', i, ':', lines[i]);
-                console.log('📋 Next 5 lines:', lines.slice(i, i + 6));
-                // The next line with 3 numbers is the record
-                for (let j = i + 1; j < i + 5 && j < lines.length; j++) {
-                  const parts = lines[j]?.split(/\\s+/);
-                  if (parts && parts.length >= 3 && /^\\d+$/.test(parts[0]) && /^\\d+$/.test(parts[1]) && /^\\d+$/.test(parts[2])) {
-                    record = { w: parseInt(parts[0]), l: parseInt(parts[1]), t: parseInt(parts[2]) };
-                    console.log('✅ Found team record:', record);
-                    break;
-                  }
-                }
-                if (record.w > 0 || record.l > 0 || record.t > 0) break;
-              }
-            }
-            
-            // Find head coach name and career record
-            const coachIdx = lines.findIndex(l => l.includes('Head Coach'));
-            if (coachIdx >= 0) {
-              console.log('📋 Found "Head Coach" at line', coachIdx);
-              console.log('📋 Next 10 lines:', lines.slice(coachIdx, coachIdx + 11));
+            try {
+              const lines = text.split('
+').map(l => l.trim()).filter(l => l);
+              let teamName = '';
+              let nickname = '';
+              let record = { w: 0, l: 0, t: 0 };
+              let section = '';
+              let conference = '';
+              let headCoach = { name: '', careerRecord: { w: 0, l: 0, t: 0 }, seasonRecord: { w: 0, l: 0, t: 0 } };
               
-              // Coach name should be within next few lines
-              // Look for the line that contains the season info (e.g., "12th season, 206-95-6")
-              let coachNameFound = false;
-              for (let i = coachIdx + 1; i < coachIdx + 10 && i < lines.length; i++) {
-                const line = lines[i];
-                
-                // Check if this line has the career record format
-                // Match patterns like "12th season, 206-95-6" or "1st year"
-                const careerMatch = line.match(/(\\d+)(?:st|nd|rd|th)?\\s+(?:season|year)[,\\s]+(\\d+)-(\\d+)-(\\d+)/i);
-                
-                if (careerMatch) {
-                  // Found career record line - coach name is the previous non-empty line
-                  if (!coachNameFound && i > coachIdx + 1) {
-                    headCoach.name = lines[i - 1];
+              console.log('📋 ========== PARSING HOME PAGE ==========');
+              console.log('📋 Total lines:', lines.length);
+              
+              // Find team name
+              const subscribeIdx = lines.findIndex(l => l === 'Subscribe');
+              const historyIdx = lines.findIndex(l => l === 'History');
+              if (subscribeIdx >= 0 && historyIdx > subscribeIdx && historyIdx - subscribeIdx <= 3) {
+                teamName = lines[subscribeIdx + 1];
+                console.log('✅ Found team name:', teamName);
+              }
+              
+              // Find nickname
+              const nicknameIdx = lines.findIndex(l => l.startsWith('Nickname:'));
+              if (nicknameIdx >= 0) {
+                nickname = lines[nicknameIdx].split(':')[1]?.trim() || '';
+                console.log('✅ Found nickname:', nickname);
+              }
+              
+              // Find team record
+              for (let i = 0; i < lines.length; i++) {
+                if (lines[i].includes('Team Record') || lines[i] === 'W L T') {
+                  for (let j = i + 1; j < i + 5 && j < lines.length; j++) {
+                    const parts = lines[j]?.split(/\s+/);
+                    if (parts && parts.length >= 3 && /^\d+$/.test(parts[0]) && /^\d+$/.test(parts[1]) && /^\d+$/.test(parts[2])) {
+                      record = { w: parseInt(parts[0]), l: parseInt(parts[1]), t: parseInt(parts[2]) };
+                      console.log('✅ Found team record:', record);
+                      break;
+                    }
+                  }
+                  if (record.w > 0 || record.l > 0 || record.t > 0) break;
+                }
+              }
+              
+              // Find head coach
+              const coachIdx = lines.findIndex(l => l.includes('Head Coach'));
+              if (coachIdx >= 0) {
+                let coachNameFound = false;
+                for (let i = coachIdx + 1; i < coachIdx + 10 && i < lines.length; i++) {
+                  const line = lines[i];
+                  const careerMatch = line.match(/(\d+)(?:st|nd|rd|th)?\s+(?:season|year)[,\s]+(\d+)-(\d+)-(\d+)/i);
+                  
+                  if (careerMatch) {
+                    if (!coachNameFound && i > coachIdx + 1) {
+                      headCoach.name = lines[i - 1];
+                      coachNameFound = true;
+                    }
+                    headCoach.careerRecord = { 
+                      w: parseInt(careerMatch[2]), 
+                      l: parseInt(careerMatch[3]), 
+                      t: parseInt(careerMatch[4]) 
+                    };
+                    console.log('✅ Found head coach:', headCoach.name, 'with career record:', headCoach.careerRecord);
+                    break;
+                  } else if (line.includes('1st Year') || line.includes('1st year') || line.match(/^1st\s+(?:season|year)/i)) {
+                    if (!coachNameFound && i > coachIdx + 1) {
+                      headCoach.name = lines[i - 1];
+                    }
+                    headCoach.careerRecord = { w: 0, l: 0, t: 0 };
+                    console.log('✅ Found first-year head coach:', headCoach.name);
+                    break;
+                  } else if (!coachNameFound && line && !line.includes('Head Coach') && line.length > 2 && !line.includes('Phone:')) {
+                    headCoach.name = line;
                     coachNameFound = true;
                   }
-                  headCoach.careerRecord = { 
-                    w: parseInt(careerMatch[2]), 
-                    l: parseInt(careerMatch[3]), 
-                    t: parseInt(careerMatch[4]) 
-                  };
-                  console.log('✅ Found head coach:', headCoach.name, 'with career record:', headCoach.careerRecord);
-                  break;
-                } else if (line.includes('1st Year') || line.includes('1st year') || line.match(/^1st\\s+(?:season|year)/i)) {
-                  // First year coach
-                  if (!coachNameFound && i > coachIdx + 1) {
-                    headCoach.name = lines[i - 1];
-                  }
-                  headCoach.careerRecord = { w: 0, l: 0, t: 0 };
-                  console.log('✅ Found first-year head coach:', headCoach.name);
-                  break;
-                } else if (!coachNameFound && line && !line.includes('Head Coach') && line.length > 2 && !line.includes('Phone:')) {
-                  // First substantial line after "Head Coach" is likely the name
-                  // Skip lines that are obviously not names (like phone numbers)
-                  headCoach.name = line;
-                  coachNameFound = true;
-                  console.log('📝 Tentative coach name:', line);
+                }
+                
+                headCoach.seasonRecord = { ...record };
+              }
+              
+              const sectionIdx = lines.findIndex(l => l.includes('Section:'));
+              if (sectionIdx >= 0) {
+                section = lines[sectionIdx].split(':')[1]?.trim() || '';
+              }
+              
+              const confIdx = lines.findIndex(l => l.includes('Conference:'));
+              if (confIdx >= 0) {
+                conference = lines[confIdx].split(':')[1]?.trim() || '';
+              }
+              
+              // Parse Assistant Coaches
+              let assistantCoaches = [];
+              const assistantIdx = lines.findIndex(l => l.includes('Assistant Coaches:'));
+              if (assistantIdx >= 0) {
+                const assistantLine = lines[assistantIdx];
+                const coachesPart = assistantLine.split('Assistant Coaches:')[1]?.trim();
+                if (coachesPart) {
+                  assistantCoaches = coachesPart.split(',').map(name => name.trim()).filter(name => name);
                 }
               }
               
-              // Store current season record
-              headCoach.seasonRecord = { ...record };
-            }
-            
-            const sectionIdx = lines.findIndex(l => l.includes('Section:'));
-            if (sectionIdx >= 0) {
-              section = lines[sectionIdx].split(':')[1]?.trim() || '';
-              console.log('✅ Found section:', section);
-            }
-            
-            const confIdx = lines.findIndex(l => l.includes('Conference:'));
-            if (confIdx >= 0) {
-              conference = lines[confIdx].split(':')[1]?.trim() || '';
-              console.log('✅ Found conference:', conference);
-            }
-            
-            console.log('📋 ========== PARSE COMPLETE ==========');
-            console.log('📋 Final Results:', { teamName, nickname, record, section, conference, headCoach });
-            console.log('');
-            
-            // Parse Assistant Coaches
-            // Format: "Assistant Coaches:Kevin Johnson, Brad Musta, Ben Nelson, Nick Vatnsdal, Chad Wagner"
-            let assistantCoaches = [];
-            const assistantIdx = lines.findIndex(l => l.includes('Assistant Coaches:'));
-            if (assistantIdx >= 0) {
-              const assistantLine = lines[assistantIdx];
-              const coachesPart = assistantLine.split('Assistant Coaches:')[1]?.trim();
-              if (coachesPart) {
-                assistantCoaches = coachesPart.split(',').map(name => name.trim()).filter(name => name);
-              }
-            }
-            
-            let stats = { ppPct: 0, pkPct: 0, gpg: 0, gapg: 0 };
-            for (let i = 0; i < lines.length; i++) {
-              const parts = lines[i].split(/\\s+/);
-              if (parts.length >= 10 && parts[0].match(/\\d+/)) {
-                stats.gpg = parseFloat(parts[3]) || 0;
-                stats.gapg = parseFloat(parts[4]) || 0;
-                stats.ppPct = parseFloat(parts[6]) || 0;
-                stats.pkPct = parseFloat(parts[9]) || 0;
-                break;
-              }
-            }
-            
-            // Parse Last Game
-            // Format: "Last Game" -> score -> "Final" -> Scoreboard with team names
-            // Team    1  2  3  T
-            // Orono   0  2  3  5
-            // Hibbing/Chisholm 0  0  1  1
-            let lastGame = null;
-            const lastGameIdx = lines.findIndex(l => l === 'Last Game');
-            if (lastGameIdx >= 0) {
-              const scoreLine = lines[lastGameIdx + 1];
-              const scoreMatch = scoreLine?.match(/(\\d+)\\s*-\\s*(\\d+)/);
-              
-              if (scoreMatch) {
-                const leftScore = parseInt(scoreMatch[1]);
-                const rightScore = parseInt(scoreMatch[2]);
-                
-                // Find opponent in scoreboard - look for "Team" header, then find the line that's NOT our team
-                let opponent = '';
-                const teamHeaderIdx = lines.findIndex((l, idx) => idx > lastGameIdx && l.includes('Team') && l.includes('1') && l.includes('2'));
-                
-                if (teamHeaderIdx > 0) {
-                  // Next 2-3 lines after "Team" header are team names with scores
-                  for (let i = teamHeaderIdx + 1; i < Math.min(lines.length, teamHeaderIdx + 4); i++) {
-                    const line = lines[i];
-                    // Line should have team name followed by numbers (scores)
-                    // Match: "Hibbing/Chisholm 0  0  1  1" or similar
-                    const teamMatch = line.match(/^([A-Za-z\\/\\s-]+?)\\s+\\d/);
-                    if (teamMatch) {
-                      const potentialTeam = teamMatch[1].trim();
-                      // Skip if it's our team name
-                      if (potentialTeam.toLowerCase() !== teamName.toLowerCase()) {
-                        // Capitalize properly
-                        opponent = potentialTeam.split(' ').map(word => 
-                          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-                        ).join(' ');
-                        break;
-                      }
-                    }
-                  }
+              // Parse stats
+              let stats = { ppPct: 0, pkPct: 0, gpg: 0, gapg: 0 };
+              for (let i = 0; i < lines.length; i++) {
+                const parts = lines[i].split(/\s+/);
+                if (parts.length >= 10 && parts[0].match(/\d+/)) {
+                  stats.gpg = parseFloat(parts[3]) || 0;
+                  stats.gapg = parseFloat(parts[4]) || 0;
+                  stats.ppPct = parseFloat(parts[6]) || 0;
+                  stats.pkPct = parseFloat(parts[9]) || 0;
+                  break;
                 }
+              }
+              
+              // Parse Last Game
+              let lastGame = null;
+              const lastGameIdx = lines.findIndex(l => l === 'Last Game');
+              if (lastGameIdx >= 0) {
+                const scoreLine = lines[lastGameIdx + 1];
+                const scoreMatch = scoreLine?.match(/(\d+)\s*-\s*(\d+)/);
                 
-                // Fallback: look for "Final" then next substantive line
-                if (!opponent) {
-                  const finalIdx = lines.findIndex((l, idx) => idx > lastGameIdx && l === 'Final');
-                  if (finalIdx > 0) {
-                    for (let i = finalIdx + 1; i < Math.min(lines.length, finalIdx + 4); i++) {
+                if (scoreMatch) {
+                  const leftScore = parseInt(scoreMatch[1]);
+                  const rightScore = parseInt(scoreMatch[2]);
+                  
+                  let opponent = '';
+                  const teamHeaderIdx = lines.findIndex((l, idx) => idx > lastGameIdx && l.includes('Team') && l.includes('1') && l.includes('2'));
+                  
+                  if (teamHeaderIdx > 0) {
+                    for (let i = teamHeaderIdx + 1; i < Math.min(lines.length, teamHeaderIdx + 4); i++) {
                       const line = lines[i];
-                      if (line && line.length > 2 && line !== teamName && !line.includes('202') && !line.includes('@')) {
-                        opponent = line.split(' ').map(word => 
-                          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-                        ).join(' ');
-                        break;
+                      const teamMatch = line.match(/^([A-Za-z\/\s-]+?)\s+\d/);
+                      if (teamMatch) {
+                        const potentialTeam = teamMatch[1].trim();
+                        if (potentialTeam.toLowerCase() !== teamName.toLowerCase()) {
+                          opponent = potentialTeam.split(' ').map(word => 
+                            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                          ).join(' ');
+                          break;
+                        }
                       }
                     }
                   }
+                  
+                  if (!opponent) {
+                    const finalIdx = lines.findIndex((l, idx) => idx > lastGameIdx && l === 'Final');
+                    if (finalIdx > 0) {
+                      for (let i = finalIdx + 1; i < Math.min(lines.length, finalIdx + 4); i++) {
+                        const line = lines[i];
+                        if (line && line.length > 2 && line !== teamName && !line.includes('202') && !line.includes('@')) {
+                          opponent = line.split(' ').map(word => 
+                            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                          ).join(' ');
+                          break;
+                        }
+                      }
+                    }
+                  }
+                  
+                  let date = '';
+                  let location = '';
+                  for (let i = lastGameIdx + 3; i < Math.min(lines.length, lastGameIdx + 15); i++) {
+                    if (lines[i].includes('@') && lines[i].includes('202')) {
+                      const parts = lines[i].split('|');
+                      date = parts[0]?.trim() || lines[i];
+                      location = parts[1]?.trim() || '';
+                      break;
+                    }
+                  }
+                  
+                  const ourScore = rightScore;
+                  const oppScore = leftScore;
+                  
+                  lastGame = {
+                    opponent,
+                    ourScore,
+                    oppScore,
+                    result: ourScore > oppScore ? 'W' : ourScore < oppScore ? 'L' : 'T',
+                    date,
+                    location
+                  };
                 }
-                
-                // Find date/location
+              }
+              
+              // Parse Next Game
+              let nextGame = null;
+              const nextGameIdx = lines.findIndex(l => l === 'Next Game');
+              if (nextGameIdx >= 0) {
+                let opponent = '';
+                let isHome = false;
                 let date = '';
-                let location = '';
-                for (let i = lastGameIdx + 3; i < Math.min(lines.length, lastGameIdx + 15); i++) {
-                  if (lines[i].includes('@') && lines[i].includes('202')) {
-                    const parts = lines[i].split('|');
-                    date = parts[0]?.trim() || lines[i];
-                    location = parts[1]?.trim() || '';
+                let time = '';
+                
+                for (let i = nextGameIdx + 1; i < Math.min(lines.length, nextGameIdx + 10); i++) {
+                  if (lines[i] === 'AT') {
+                    isHome = false;
+                    for (let j = i + 1; j < Math.min(lines.length, i + 5); j++) {
+                      if (lines[j] && lines[j].length > 2 && lines[j] !== teamName && !lines[j].includes('@')) {
+                        opponent = lines[j];
+                        break;
+                      }
+                    }
+                    break;
+                  } else if (lines[i] === 'VS') {
+                    isHome = true;
+                    for (let j = i + 1; j < Math.min(lines.length, i + 5); j++) {
+                      if (lines[j] && lines[j].length > 2 && lines[j] !== teamName && !lines[j].includes('@')) {
+                        opponent = lines[j];
+                        break;
+                      }
+                    }
                     break;
                   }
                 }
                 
-                // Determine which score is ours
-                const ourScore = rightScore;
-                const oppScore = leftScore;
+                for (let i = nextGameIdx + 1; i < Math.min(lines.length, nextGameIdx + 15); i++) {
+                  if (lines[i].includes('@') && (lines[i].includes(':') || lines[i].includes('p') || lines[i].includes('a'))) {
+                    const parts = lines[i].split('@');
+                    date = parts[0]?.trim() || '';
+                    time = parts[1]?.trim() || '';
+                    break;
+                  }
+                }
                 
-                lastGame = {
+                nextGame = {
                   opponent,
-                  ourScore,
-                  oppScore,
-                  result: ourScore > oppScore ? 'W' : ourScore < oppScore ? 'L' : 'T',
+                  isHome,
                   date,
-                  location
+                  time,
+                  gameNum: ''
                 };
               }
-            }
-            
-            // Parse Next Game
-            // Format: Our team name -> "AT" or "VS" -> Opponent -> Date with @
-            let nextGame = null;
-            const nextGameIdx = lines.findIndex(l => l === 'Next Game');
-            if (nextGameIdx >= 0) {
-              let opponent = '';
-              let isHome = false;
-              let date = '';
-              let time = '';
               
-              // Look for "AT" (we're away) or "VS" (we're home)
-              for (let i = nextGameIdx + 1; i < Math.min(lines.length, nextGameIdx + 10); i++) {
-                if (lines[i] === 'AT') {
-                  isHome = false;
-                  // Opponent should be 2-3 lines after AT
-                  for (let j = i + 1; j < Math.min(lines.length, i + 5); j++) {
-                    if (lines[j] && lines[j].length > 2 && lines[j] !== teamName && !lines[j].includes('@')) {
-                      opponent = lines[j];
-                      break;
-                    }
-                  }
-                  break;
-                } else if (lines[i] === 'VS') {
-                  isHome = true;
-                  // Opponent should be 2-3 lines after VS
-                  for (let j = i + 1; j < Math.min(lines.length, i + 5); j++) {
-                    if (lines[j] && lines[j].length > 2 && lines[j] !== teamName && !lines[j].includes('@')) {
-                      opponent = lines[j];
-                      break;
-                    }
-                  }
-                  break;
-                }
+              if (nextGame) {
+                nextGame.gameNum = (record.w + record.l + record.t + 1).toString();
               }
               
-              // Look for date line (contains @ and time like "6:00p")
-              for (let i = nextGameIdx + 1; i < Math.min(lines.length, nextGameIdx + 15); i++) {
-                if (lines[i].includes('@') && (lines[i].includes(':') || lines[i].includes('p') || lines[i].includes('a'))) {
-                  const parts = lines[i].split('@');
-                  date = parts[0]?.trim() || '';
-                  time = parts[1]?.trim() || '';
-                  break;
-                }
-              }
+              console.log('📋 ========== PARSE COMPLETE ==========');
               
-              nextGame = {
-                opponent,
-                isHome,
-                date,
-                time,
-                gameNum: '' // Will be calculated from record
+              return { teamName, nickname, record, section, conference, headCoach, assistantCoaches, stats, lastGame, nextGame };
+            } catch (error) {
+              console.error('Error parsing home page:', error);
+              return { 
+                teamName: '', nickname: '', record: { w: 0, l: 0, t: 0 }, 
+                section: '', conference: '', headCoach: { name: '', careerRecord: { w: 0, l: 0, t: 0 }, seasonRecord: { w: 0, l: 0, t: 0 } }, 
+                assistantCoaches: [], stats: { ppPct: 0, pkPct: 0, gpg: 0, gapg: 0 }, lastGame: null, nextGame: null 
               };
             }
-            
-            // Calculate next game number from record (W + L + T + 1)
-            if (nextGame) {
-              nextGame.gameNum = (record.w + record.l + record.t + 1).toString();
-            }
-            
-            return { teamName, nickname, record, section, conference, headCoach, assistantCoaches, stats, lastGame, nextGame };
           };
 
           const parseRoster = (text, existingRoster = []) => {
-  console.log('=== parseRoster called ===');
-  console.log('Text length:', text.length);
-  console.log('Existing roster size:', existingRoster.length);
-  const lines = text.split('\\n').map(l => l.trim()).filter(l => l);
-  console.log('Total lines:', lines.length);
-  let roster = [];
-  
-  // Data is tab-separated on individual lines
-  // Format: NUMBER [tab] NAME [tab] POSITION [tab] GRADE [tab] HEIGHT [tab] WEIGHT [tab] SHOOTS/CATCHES [tab] DOB
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    
-    // Split by tabs
-    const fields = line.split('\\t').map(f => f.trim()).filter(f => f);
-    
-    // Valid player line has: number, name, position (F/D/G), grade
-    if (fields.length >= 4) {
-      const number = fields[0];
-      const name = fields[1];
-      const position = fields[2];
-      const grade = fields[3];
-      
-      // Check if this looks like a player line
-      if (/^\\d+$/.test(number) && /^[FDG]$/.test(position) && /^\\d{1,2}$/.test(grade)) {
-        console.log('
- Found player:', { number, name, position, grade, fields });
-        
-        const nameParts = name.split(' ');
-        const lastName = nameParts[nameParts.length - 1];
-        const firstName = nameParts.slice(0, -1).join(' ');
-        
-        // Extract handedness from "Shoots" or "Catches" field (usually field 6)
-        let handed = '';
-        let shoots = ''; // For goalies (catches)
-        for (let j = 4; j < fields.length; j++) {
-          if (fields[j].includes('Left')) {
-            handed = 'L';
-            shoots = 'L';
-            break;
-          } else if (fields[j].includes('Right')) {
-            handed = 'R';
-            shoots = 'R';
-            break;
-          }
-        }
-        
-        // Extract DOB year (usually last field, format: "2007" or "12/15/2007")
-        let dobYear = '';
-        const lastField = fields[fields.length - 1];
-        const yearMatch = lastField.match(/\\b(19|20)\\d{2}\\b/);
-        if (yearMatch) {
-          dobYear = yearMatch[0];
-        }
-        
-        // Check if this player already exists in the existing roster (match by name)
-        const existingPlayer = existingRoster.find(p => 
-          p.lastName?.toUpperCase() === lastName.toUpperCase() && 
-          p.firstName?.charAt(0)?.toUpperCase() === firstName.charAt(0)?.toUpperCase()
-        );
-        
-        roster.push({
-          id: `${number}-${lastName}`,
-          number: number,
-          name: name,
-          firstName: firstName,
-          lastName: lastName,
-          position: position,
-          grade: grade,
-          dobYear: dobYear,
-          handed: handed,
-          shoots: shoots,
-          stats: { gp: 0, g: 0, a: 0, pts: 0, ppg: 0, ppa: 0, sh: 0, sha: 0, pim: 0, plusMinus: 0, fow: 0, fol: 0 },
-          goalieStats: position === 'G' ? { gp: 0, min: '0:00', w: 0, l: 0, t: 0, sog: 0, ga: 0, sv: 0, gaa: 0, svp: '.000', so: 0 } : null,
-          // PRESERVE career data if it exists from previous roster
-          baseCareerStats: existingPlayer?.baseCareerStats || undefined,
-          baseCareerGoalieStats: existingPlayer?.baseCareerGoalieStats || undefined,
-          pronunciation: existingPlayer?.pronunciation || undefined
-        });
-      }
-    }
-  }
-  
-  console.log('Final roster size:', roster.length);
-  console.log('Roster:', roster);
-  return roster;
-};
-
-          const parseSchedule = (text) => {
-  console.log('📅 ========== PARSING SCHEDULE ==========');
-  const lines = text.split('\\n').map(l => l.trim());
-  console.log('📅 Total lines:', lines.length);
-  console.log('📅 First 20 lines:', lines.slice(0, 20));
-  
-  let gameNum = 0;
-  let nextGame = { gameNum: '', opponent: '', date: '', time: '', location: '', oppRecord: '', oppSection: '', oppConference: '' };
-  let lastGame = { gameNum: '', opponent: '', date: '', time: '', location: '', oppRecord: '', oppSection: '', oppConference: '' };
-  let foundNextGame = false;
-  
-  // Parse each game line by line
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    
-    // Look for date line (starts with day of week) - only count lines that have game info following
-    if (line.match(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/) && i + 1 < lines.length) {
-      // Check if this is actually a game (next line should be score or "-")
-      const nextLine = lines[i + 1];
-      
-      // Skip if next line is empty or doesn't look like a score/dash
-      if (!nextLine || (!nextLine.includes('-') && !nextLine.match(/^\\d+$/))) {
-        continue;
-      }
-      
-      gameNum++;
-      console.log('📅 Found game', gameNum, 'at line', i);
-      
-      // Extract game details
-      const opponentLine = lines[i + 2] || '';
-      const locationLine = lines[i + 3] || '';
-      
-      // Store as last game
-      lastGame.gameNum = gameNum.toString();
-      lastGame.date = line;
-      lastGame.opponent = opponentLine.replace('@', '').trim();
-      lastGame.location = locationLine;
-      
-      // Check if this game hasn't been played yet (score is just "-")
-      if (nextLine === '-' && !foundNextGame) {
-        // This is the next unplayed game!
-        nextGame = { ...lastGame };
-        foundNextGame = true;
-        console.log('✅ Found next game:', nextGame);
-      }
-    }
-  }
-  
-  console.log('📅 Total games found:', gameNum);
-  console.log('📅 Next game:', nextGame);
-  console.log('📅 ========== PARSE COMPLETE ==========');
-  console.log('');
-  
-  // If no unplayed game found, return the last game
-  return foundNextGame ? nextGame : lastGame;
-};
+            try {
+              console.log('=== parseRoster called ===');
+              const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+              console.log('Total lines:', lines.length);
+              let roster = [];
+              
+              for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const fields = line.split('\t').map(f => f.trim()).filter(f => f);
+                
+                if (fields.length >= 4) {
+                  const number = fields[0];
+                  const name = fields[1];
+                  const position = fields[2];
+                  const grade = fields[3];
+                  
+                  if (/^\d+$/.test(number) && /^[FDG]$/.test(position) && /^\d{1,2}$/.test(grade)) {
+                    console.log('✓ Found player:', { number, name, position, grade });
+                    
+                    const nameParts = name.split(' ');
+                    const lastName = nameParts[nameParts.length - 1];
+                    const firstName = nameParts.slice(0, -1).join(' ');
+                    
+                    let handed = '';
+                    let shoots = '';
+                    for (let j = 4; j < fields.length; j++) {
+                      if (fields[j].includes('Left')) {
+                        handed = 'L';
+                        shoots = 'L';
+                        break;
+                      } else if (fields[j].includes('Right')) {
+                        handed = 'R';
+                        shoots = 'R';
+                        break;
+                      }
+                    }
+                    
+                    let dobYear = '';
+                    const lastField = fields[fields.length - 1];
+                    const yearMatch = lastField.match(/\b(19|20)\d{2}\b/);
+                    if (yearMatch) {
+                      dobYear = yearMatch[0];
+                    }
+                    
+                    const existingPlayer = existingRoster.find(p => 
+                      p.lastName?.toUpperCase() === lastName.toUpperCase() && 
+                      p.firstName?.charAt(0)?.toUpperCase() === firstName.charAt(0)?.toUpperCase()
+                    );
+                    
+                    roster.push({
+                      id: `${number}-${lastName}`,
+                      number: number,
+                      name: name,
+                      firstName: firstName,
+                      lastName: lastName,
+                      position: position,
+                      grade: grade,
+                      dobYear: dobYear,
+                      handed: handed,
+                      shoots: shoots,
+                      stats: { gp: 0, g: 0, a: 0, pts: 0, ppg: 0, ppa: 0, sh: 0, sha: 0, pim: 0, plusMinus: 0, fow: 0, fol: 0 },
+                      goalieStats: position === 'G' ? { gp: 0, min: '0:00', w: 0, l: 0, t: 0, sog: 0, ga: 0, sv: 0, gaa: 0, svp: '.000', so: 0 } : null,
+                      baseCareerStats: existingPlayer?.baseCareerStats || undefined,
+                      baseCareerGoalieStats: existingPlayer?.baseCareerGoalieStats || undefined,
+                      pronunciation: existingPlayer?.pronunciation || undefined
+                    });
+                  }
+                }
+              }
+              
+              console.log('Final roster size:', roster.length);
+              return roster;
+            } catch (error) {
+              console.error('Error parsing roster:', error);
+              return [];
+            }
+          };
 
           const parsePlayerStats = (text, existingRoster) => {
-            console.log('=== parsePlayerStats called ===');
-            const lines = text.split('\\n').map(l => l.trim()).filter(l => l);
-            console.log('Total lines:', lines.length);
-            
-            const updatedRoster = [...existingRoster];
-            let inSkaterSection = false;
-            let inGoalieSection = false;
-            
-            for (let i = 0; i < lines.length; i++) {
-              const line = lines[i];
+            try {
+              console.log('=== parsePlayerStats called ===');
+              const lines = text.split('\n').map(l => l.trim()).filter(l => l);
               
-              // Detect sections
-              if (line === 'Skater') {
-                inSkaterSection = true;
-                inGoalieSection = false;
-                console.log('Found Skater section at line', i);
-                continue;
-              }
-              if (line === 'Goalie') {
-                inSkaterSection = false;
-                inGoalieSection = true;
-                console.log('Found Goalie section at line', i);
-                continue;
-              }
+              const updatedRoster = [...existingRoster];
+              let inSkaterSection = false;
+              let inGoalieSection = false;
               
-              // Skip headers
-              if (line === '#' || line === 'Name' || line === 'GP' || line.includes('AVG PTS')) continue;
-              
-              // Split by tabs
-              const fields = line.split('\\t').filter(f => f.trim());
-              
-              // Need at least player number and name
-              if (fields.length < 3) continue;
-              
-              const number = fields[0];
-              const name = fields[1];
-              
-              // Must start with a digit
-              if (!/^\\d+$/.test(number)) continue;
-              
-              if (inSkaterSection) {
-                const player = updatedRoster.find(p => p.number === number && p.position !== 'G');
+              for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
                 
-                if (player && fields.length >= 6) {
-                  // DEBUG: Check if baseCareer exists
-                  if (player.baseCareerStats) {
-                    console.log(`
- \u56589 
-  ${name} HAS baseCareer:`, player.baseCareerStats);
-                  } else {
-                    console.log(`
- \u65039 
-  ${name} has NO baseCareer (rookie or not imported yet)`);
+                if (line === 'Skater') {
+                  inSkaterSection = true;
+                  inGoalieSection = false;
+                  continue;
+                }
+                if (line === 'Goalie') {
+                  inSkaterSection = false;
+                  inGoalieSection = true;
+                  continue;
+                }
+                
+                if (line === '#' || line === 'Name' || line === 'GP' || line.includes('AVG PTS')) continue;
+                
+                const fields = line.split('\t').filter(f => f.trim());
+                
+                if (fields.length < 3) continue;
+                
+                const number = fields[0];
+                const name = fields[1];
+                
+                if (!/^\d+$/.test(number)) continue;
+                
+                if (inSkaterSection) {
+                  const player = updatedRoster.find(p => p.number === number && p.position !== 'G');
+                  
+                  if (player && fields.length >= 6) {
+                    const currentStats = {
+                      gp: parseInt(fields[2]) || 0,
+                      g: parseInt(fields[3]) || 0,
+                      a: parseInt(fields[4]) || 0,
+                      pts: parseInt(fields[5]) || 0,
+                      ppg: parseInt(fields[8]) || 0,
+                      ppa: parseInt(fields[9]) || 0,
+                      sh: parseInt(fields[10]) || 0,
+                      sha: parseInt(fields[11]) || 0,
+                      pim: parseInt(fields[13]) || 0,
+                      fow: parseInt(fields[14]) || 0,
+                      fol: parseInt(fields[15]) || 0,
+                      plusMinus: parseInt(fields[19]) || 0
+                    };
+                    
+                    player.stats = currentStats;
+                    
+                    const baseCareer = player.baseCareerStats || { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0, fow: 0, fol: 0 };
+                    const totalFOW = (baseCareer.fow || 0) + currentStats.fow;
+                    const totalFOL = (baseCareer.fol || 0) + currentStats.fol;
+                    const careerFaceoffPct = (totalFOW + totalFOL > 0) ? ((totalFOW / (totalFOW + totalFOL)) * 100).toFixed(1) : '0.0';
+                    
+                    player.careerStats = {
+                      gp: baseCareer.gp + currentStats.gp,
+                      g: baseCareer.g + currentStats.g,
+                      a: baseCareer.a + currentStats.a,
+                      pts: baseCareer.pts + currentStats.pts,
+                      plusMinus: baseCareer.plusMinus + currentStats.plusMinus,
+                      faceoffPct: careerFaceoffPct,
+                      fow: totalFOW,
+                      fol: totalFOL
+                    };
+                    
+                    console.log(`✓ Updated ${name}:`, player.stats, 'Career:', player.careerStats);
                   }
+                } else if (inGoalieSection) {
+                  const player = updatedRoster.find(p => p.number === number && p.position === 'G');
                   
-                  // Current season stats
-                  const currentStats = {
-                    gp: parseInt(fields[2]) || 0,
-                    g: parseInt(fields[3]) || 0,
-                    a: parseInt(fields[4]) || 0,
-                    pts: parseInt(fields[5]) || 0,
-                    ppg: parseInt(fields[8]) || 0,
-                    ppa: parseInt(fields[9]) || 0,
-                    sh: parseInt(fields[10]) || 0,
-                    sha: parseInt(fields[11]) || 0,
-                    pim: parseInt(fields[13]) || 0,
-                    fow: parseInt(fields[14]) || 0,
-                    fol: parseInt(fields[15]) || 0,
-                    plusMinus: parseInt(fields[19]) || 0
-                  };
-                  
-                  player.stats = currentStats;
-                  
-                  // Career stats = base career (from My Team Setup) + current season
-                  // If no baseCareer exists, player is a rookie - career = current only
-                  const baseCareer = player.baseCareerStats || { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0, fow: 0, fol: 0 };
-                  const totalFOW = (baseCareer.fow || 0) + currentStats.fow;
-                  const totalFOL = (baseCareer.fol || 0) + currentStats.fol;
-                  const careerFaceoffPct = (totalFOW + totalFOL > 0) ? ((totalFOW / (totalFOW + totalFOL)) * 100).toFixed(1) : '0.0';
-                  
-                  player.careerStats = {
-                    gp: baseCareer.gp + currentStats.gp,
-                    g: baseCareer.g + currentStats.g,
-                    a: baseCareer.a + currentStats.a,
-                    pts: baseCareer.pts + currentStats.pts,
-                    plusMinus: baseCareer.plusMinus + currentStats.plusMinus,
-                    faceoffPct: careerFaceoffPct,
-                    fow: totalFOW,
-                    fol: totalFOL
-                  };
-                  
-                  console.log(`
- Updated ${name}:`, player.stats, 'Career:', player.careerStats);
-                }
-              } else if (inGoalieSection) {
-                const player = updatedRoster.find(p => p.number === number && p.position === 'G');
-                
-                if (player && player.goalieStats && fields.length >= 10) {
-                  // Current season goalie stats
-                  // Columns: # | Name | GP | MIN | W | L | T | SOG | GA | SV | GAA | SV% | SO
-                  const currentGoalieStats = {
-                    gp: parseInt(fields[2]) || 0,      // GP
-                    min: fields[3] || '0:00',          // MIN
-                    w: parseInt(fields[4]) || 0,       // W
-                    l: parseInt(fields[5]) || 0,       // L
-                    t: parseInt(fields[6]) || 0,       // T
-                    sog: parseInt(fields[7]) || 0,     // SOG
-                    ga: parseInt(fields[8]) || 0,      // GA
-                    sv: parseInt(fields[9]) || 0,      // SV
-                    gaa: parseFloat(fields[10]) || 0,  // GAA
-                    svp: fields[11] || '.000',         // SV%
-                    so: parseInt(fields[12]) || 0      // SO
-                  };
-                  
-                  player.goalieStats = currentGoalieStats;
-                  
-                  // Career = base career (from My Team Setup) + current season
-                  console.log(`
- \u56589 
-  ${name} baseCareerGoalieStats:`, player.baseCareerGoalieStats);
-                  const baseCareer = player.baseCareerGoalieStats || { gp: 0, min: '0:00', w: 0, l: 0, t: 0, so: 0, ga: 0, sv: 0 };
-                  console.log(`
- \u56589 
-  ${name} using baseCareer:`, baseCareer);
-                  
-                  // Convert minutes to total seconds
-                  const parseMinutes = (minStr) => {
-                    const parts = minStr.split(':');
-                    return parseInt(parts[0]) * 60 + parseInt(parts[1] || 0);
-                  };
-                  
-                  const baseSeconds = parseMinutes(baseCareer.min);
-                  const currSeconds = parseMinutes(currentGoalieStats.min);
-                  const totalSeconds = baseSeconds + currSeconds;
-                  const totalMinStr = `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}`;
-                  
-                  const totalGA = baseCareer.ga + currentGoalieStats.ga;
-                  const totalSV = baseCareer.sv + currentGoalieStats.sv;
-                  const totalSOG = totalGA + totalSV;
-                  
-                  // Career GAA formula: Total GA / (Total Minutes / 51)
-                  const totalMinutes = totalSeconds / 60;
-                  const careerGAA = totalMinutes > 0 ? (totalGA / (totalMinutes / 51)).toFixed(2) : '0.00';
-                  
-                  // Career SV%
-                  const careerSVP = totalSOG > 0 ? (totalSV / totalSOG).toFixed(3) : '.000';
-                  
-                  player.careerGoalieStats = {
-                    gp: baseCareer.gp + currentGoalieStats.gp,
-                    min: totalMinStr,
-                    w: baseCareer.w + currentGoalieStats.w,
-                    l: baseCareer.l + currentGoalieStats.l,
-                    t: baseCareer.t + currentGoalieStats.t,
-                    so: baseCareer.so + currentGoalieStats.so,
-                    ga: totalGA,
-                    sv: totalSV,
-                    gaa: parseFloat(careerGAA),
-                    svp: careerSVP
-                  };
-                  
-                  console.log(`
- Updated goalie ${name}:`, player.goalieStats, 'Career:', player.careerGoalieStats);
+                  if (player && player.goalieStats && fields.length >= 10) {
+                    const currentGoalieStats = {
+                      gp: parseInt(fields[2]) || 0,
+                      min: fields[3] || '0:00',
+                      w: parseInt(fields[4]) || 0,
+                      l: parseInt(fields[5]) || 0,
+                      t: parseInt(fields[6]) || 0,
+                      sog: parseInt(fields[7]) || 0,
+                      ga: parseInt(fields[8]) || 0,
+                      sv: parseInt(fields[9]) || 0,
+                      gaa: parseFloat(fields[10]) || 0,
+                      svp: fields[11] || '.000',
+                      so: parseInt(fields[12]) || 0
+                    };
+                    
+                    player.goalieStats = currentGoalieStats;
+                    
+                    const baseCareer = player.baseCareerGoalieStats || { gp: 0, min: '0:00', w: 0, l: 0, t: 0, so: 0, ga: 0, sv: 0 };
+                    
+                    const parseMinutes = (minStr) => {
+                      const parts = minStr.split(':');
+                      return parseInt(parts[0]) * 60 + parseInt(parts[1] || 0);
+                    };
+                    
+                    const baseSeconds = parseMinutes(baseCareer.min);
+                    const currSeconds = parseMinutes(currentGoalieStats.min);
+                    const totalSeconds = baseSeconds + currSeconds;
+                    const totalMinStr = `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}`;
+                    
+                    const totalGA = baseCareer.ga + currentGoalieStats.ga;
+                    const totalSV = baseCareer.sv + currentGoalieStats.sv;
+                    const totalSOG = totalGA + totalSV;
+                    
+                    const totalMinutes = totalSeconds / 60;
+                    const careerGAA = totalMinutes > 0 ? (totalGA / (totalMinutes / 51)).toFixed(2) : '0.00';
+                    const careerSVP = totalSOG > 0 ? (totalSV / totalSOG).toFixed(3) : '.000';
+                    
+                    player.careerGoalieStats = {
+                      gp: baseCareer.gp + currentGoalieStats.gp,
+                      min: totalMinStr,
+                      w: baseCareer.w + currentGoalieStats.w,
+                      l: baseCareer.l + currentGoalieStats.l,
+                      t: baseCareer.t + currentGoalieStats.t,
+                      so: baseCareer.so + currentGoalieStats.so,
+                      ga: totalGA,
+                      sv: totalSV,
+                      gaa: parseFloat(careerGAA),
+                      svp: careerSVP
+                    };
+                    
+                    console.log(`✓ Updated goalie ${name}:`, player.goalieStats, 'Career:', player.careerGoalieStats);
+                  }
                 }
               }
+              
+              return updatedRoster;
+            } catch (error) {
+              console.error('Error parsing player stats:', error);
+              return existingRoster;
             }
-            
-            console.log('Final updated roster:', updatedRoster);
-            return updatedRoster;
           };
 
           const parseCareerStats = (text, existingRoster) => {
-            console.log('=== parseCareerStats called ===');
-            const lines = text.split('\\n').map(l => l.trim()).filter(l => l);
-            console.log('Total lines:', lines.length);
-            
-            const updatedRoster = [...existingRoster];
-            let inSkaterSection = false;
-            let inGoalieSection = false;
-            
-            for (let i = 0; i < lines.length; i++) {
-              const line = lines[i];
+            try {
+              console.log('=== parseCareerStats called ===');
+              const lines = text.split('\n').map(l => l.trim()).filter(l => l);
               
-              // Detect sections
-              if (line === 'Skater') {
-                inSkaterSection = true;
-                inGoalieSection = false;
-                console.log('Found Skater section at line', i);
-                continue;
-              }
-              if (line === 'Goalie') {
-                inSkaterSection = false;
-                inGoalieSection = true;
-                console.log('Found Goalie section at line', i);
-                continue;
-              }
+              const updatedRoster = [...existingRoster];
+              let inSkaterSection = false;
+              let inGoalieSection = false;
               
-              // Skip headers
-              if (line === '#' || line === 'Name' || line === 'GP' || line.includes('AVG PTS')) continue;
-              
-              // Split by tabs
-              const fields = line.split('\\t').filter(f => f.trim());
-              
-              // Need at least player number and name
-              if (fields.length < 3) continue;
-              
-              const number = fields[0];
-              const name = fields[1];
-              
-              // Must start with a digit
-              if (!/^\\d+$/.test(number)) continue;
-              
-              if (inSkaterSection) {
-                // Normalize number for matching (trim and compare as strings)
-                const normalizedNumber = number.trim();
+              for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
                 
-                // Extract last name and first initial from career import
-                const careerNameParts = name.trim().split(/\\s+/);
-                const careerFirstInitial = careerNameParts[0]?.charAt(0)?.toUpperCase() || '';
-                const careerLastName = careerNameParts[careerNameParts.length - 1]?.toUpperCase() || '';
-                
-                // Try to match by: 1) Last Name + First Initial (primary), 2) Jersey Number (fallback)
-                let player = updatedRoster.find(p => {
-                  if (p.position === 'G') return false; // Skip goalies
-                  
-                  const rosterFirstInitial = p.firstName?.charAt(0)?.toUpperCase() || '';
-                  const rosterLastName = p.lastName?.toUpperCase() || '';
-                  
-                  // Primary match: Last Name + First Initial
-                  const nameMatch = rosterLastName === careerLastName && rosterFirstInitial === careerFirstInitial;
-                  
-                  // Fallback match: Jersey Number (if name doesn't match)
-                  const numberMatch = p.number.toString().trim() === normalizedNumber;
-                  
-                  return nameMatch || numberMatch;
-                });
-                
-                // Log matching attempt
-                if (player) {
-                  const matchType = (player.lastName?.toUpperCase() === careerLastName && 
-                                    player.firstName?.charAt(0)?.toUpperCase() === careerFirstInitial) 
-                                    ? 'by NAME' : 'by NUMBER';
-                  console.log(`Trying to match skater #${normalizedNumber} (${name}): 
- FOUND ${matchType} 
- #${player.number} ${player.name}`);
-                } else {
-                  console.log(`Trying to match skater #${normalizedNumber} (${name}): 
- NOT FOUND`);
+                if (line === 'Skater') {
+                  inSkaterSection = true;
+                  inGoalieSection = false;
+                  continue;
+                }
+                if (line === 'Goalie') {
+                  inSkaterSection = false;
+                  inGoalieSection = true;
+                  continue;
                 }
                 
-                if (player && fields.length >= 6) {
-                  // This season's stats from career import
-                  const seasonGP = parseInt(fields[2]) || 0;
-                  const seasonG = parseInt(fields[3]) || 0;
-                  const seasonA = parseInt(fields[4]) || 0;
-                  const seasonPts = parseInt(fields[5]) || 0;
-                  const seasonPlusMinus = parseInt(fields[19]) || 0;
-                  const seasonFOW = parseInt(fields[14]) || 0;
-                  const seasonFOL = parseInt(fields[15]) || 0;
-                  
-                  // Add to existing base career (for multiple season imports)
-                  const existing = player.baseCareerStats || { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0, fow: 0, fol: 0 };
-                  
-                  player.baseCareerStats = {
-                    gp: existing.gp + seasonGP,
-                    g: existing.g + seasonG,
-                    a: existing.a + seasonA,
-                    pts: existing.pts + seasonPts,
-                    plusMinus: existing.plusMinus + seasonPlusMinus,
-                    fow: existing.fow + seasonFOW,
-                    fol: existing.fol + seasonFOL
-                  };
-                  
-                  console.log(`
- Base career for ${name}:`, player.baseCareerStats);
-                } else if (!player) {
-                  console.log(`
- No roster match for #${normalizedNumber} ${name}`);
-                }
-              } else if (inGoalieSection) {
-                // Normalize number for matching
-                const normalizedNumber = number.trim();
+                if (line === '#' || line === 'Name' || line === 'GP' || line.includes('AVG PTS')) continue;
                 
-                // Extract last name and first initial from career import
-                const careerNameParts = name.trim().split(/\\s+/);
-                const careerFirstInitial = careerNameParts[0]?.charAt(0)?.toUpperCase() || '';
-                const careerLastName = careerNameParts[careerNameParts.length - 1]?.toUpperCase() || '';
+                const fields = line.split('\t').filter(f => f.trim());
                 
-                // Try to match by: 1) Last Name + First Initial (primary), 2) Jersey Number (fallback)
-                let player = updatedRoster.find(p => {
-                  if (p.position !== 'G') return false; // Only goalies
-                  
-                  const rosterFirstInitial = p.firstName?.charAt(0)?.toUpperCase() || '';
-                  const rosterLastName = p.lastName?.toUpperCase() || '';
-                  
-                  // Primary match: Last Name + First Initial
-                  const nameMatch = rosterLastName === careerLastName && rosterFirstInitial === careerFirstInitial;
-                  
-                  // Fallback match: Jersey Number
-                  const numberMatch = p.number.toString().trim() === normalizedNumber;
-                  
-                  return nameMatch || numberMatch;
-                });
+                if (fields.length < 3) continue;
                 
-                // Log matching attempt
-                if (player) {
-                  const matchType = (player.lastName?.toUpperCase() === careerLastName && 
-                                    player.firstName?.charAt(0)?.toUpperCase() === careerFirstInitial) 
-                                    ? 'by NAME' : 'by NUMBER';
-                  console.log(`Trying to match goalie #${normalizedNumber} (${name}): 
- FOUND ${matchType} 
- #${player.number} ${player.name}`);
-                } else {
-                  console.log(`Trying to match goalie #${normalizedNumber} (${name}): 
- NOT FOUND`);
-                }
+                const number = fields[0];
+                const name = fields[1];
                 
-                if (player && fields.length >= 10) {
-                  // Career import goalie stats
-                  // Columns: # | Name | GP | MIN | W | L | T | SOG | GA | SV | GAA | SV% | SO
-                  const seasonGP = parseInt(fields[2]) || 0;      // GP
-                  const seasonMin = fields[3] || '0:00';          // MIN
-                  const seasonW = parseInt(fields[4]) || 0;       // W
-                  const seasonL = parseInt(fields[5]) || 0;       // L
-                  const seasonT = parseInt(fields[6]) || 0;       // T
-                  // Skip SOG (fields[7]) - we calculate from GA + SV
-                  const seasonGA = parseInt(fields[8]) || 0;      // GA
-                  const seasonSV = parseInt(fields[9]) || 0;      // SV
-                  // Skip GAA (fields[10]) - we calculate it
-                  // Skip SV% (fields[11]) - we calculate it
-                  const seasonSO = parseInt(fields[12]) || 0;     // SO
+                if (!/^\d+$/.test(number)) continue;
+                
+                if (inSkaterSection) {
+                  const normalizedNumber = number.trim();
+                  const careerNameParts = name.trim().split(/\s+/);
+                  const careerFirstInitial = careerNameParts[0]?.charAt(0)?.toUpperCase() || '';
+                  const careerLastName = careerNameParts[careerNameParts.length - 1]?.toUpperCase() || '';
                   
-                  // Convert minutes to seconds for accumulation
-                  const parseMinutes = (minStr) => {
-                    const parts = minStr.split(':');
-                    return parseInt(parts[0]) * 60 + parseInt(parts[1] || 0);
-                  };
+                  let player = updatedRoster.find(p => {
+                    if (p.position === 'G') return false;
+                    
+                    const rosterFirstInitial = p.firstName?.charAt(0)?.toUpperCase() || '';
+                    const rosterLastName = p.lastName?.toUpperCase() || '';
+                    
+                    const nameMatch = rosterLastName === careerLastName && rosterFirstInitial === careerFirstInitial;
+                    const numberMatch = p.number.toString().trim() === normalizedNumber;
+                    
+                    return nameMatch || numberMatch;
+                  });
                   
-                  const existing = player.baseCareerGoalieStats || { gp: 0, min: '0:00', w: 0, l: 0, t: 0, so: 0, ga: 0, sv: 0 };
-                  const existingSeconds = parseMinutes(existing.min);
-                  const seasonSeconds = parseMinutes(seasonMin);
-                  const totalSeconds = existingSeconds + seasonSeconds;
-                  const totalMinStr = `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}`;
+                  if (player && fields.length >= 6) {
+                    const seasonGP = parseInt(fields[2]) || 0;
+                    const seasonG = parseInt(fields[3]) || 0;
+                    const seasonA = parseInt(fields[4]) || 0;
+                    const seasonPts = parseInt(fields[5]) || 0;
+                    const seasonPlusMinus = parseInt(fields[19]) || 0;
+                    const seasonFOW = parseInt(fields[14]) || 0;
+                    const seasonFOL = parseInt(fields[15]) || 0;
+                    
+                    const existing = player.baseCareerStats || { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0, fow: 0, fol: 0 };
+                    
+                    player.baseCareerStats = {
+                      gp: existing.gp + seasonGP,
+                      g: existing.g + seasonG,
+                      a: existing.a + seasonA,
+                      pts: existing.pts + seasonPts,
+                      plusMinus: existing.plusMinus + seasonPlusMinus,
+                      fow: existing.fow + seasonFOW,
+                      fol: existing.fol + seasonFOL
+                    };
+                    
+                    console.log(`✓ Base career for ${name}:`, player.baseCareerStats);
+                  }
+                } else if (inGoalieSection) {
+                  const normalizedNumber = number.trim();
+                  const careerNameParts = name.trim().split(/\s+/);
+                  const careerFirstInitial = careerNameParts[0]?.charAt(0)?.toUpperCase() || '';
+                  const careerLastName = careerNameParts[careerNameParts.length - 1]?.toUpperCase() || '';
                   
-                  player.baseCareerGoalieStats = {
-                    gp: existing.gp + seasonGP,
-                    min: totalMinStr,
-                    w: existing.w + seasonW,
-                    l: existing.l + seasonL,
-                    t: existing.t + seasonT,
-                    so: existing.so + seasonSO,
-                    ga: existing.ga + seasonGA,
-                    sv: existing.sv + seasonSV
-                  };
+                  let player = updatedRoster.find(p => {
+                    if (p.position !== 'G') return false;
+                    
+                    const rosterFirstInitial = p.firstName?.charAt(0)?.toUpperCase() || '';
+                    const rosterLastName = p.lastName?.toUpperCase() || '';
+                    
+                    const nameMatch = rosterLastName === careerLastName && rosterFirstInitial === careerFirstInitial;
+                    const numberMatch = p.number.toString().trim() === normalizedNumber;
+                    
+                    return nameMatch || numberMatch;
+                  });
                   
-                  console.log(`
- Base career goalie for ${name}:`, player.baseCareerGoalieStats);
-                } else if (!player) {
-                  console.log(`
- No roster match for goalie #${normalizedNumber} ${name}`);
+                  if (player && fields.length >= 10) {
+                    const seasonGP = parseInt(fields[2]) || 0;
+                    const seasonMin = fields[3] || '0:00';
+                    const seasonW = parseInt(fields[4]) || 0;
+                    const seasonL = parseInt(fields[5]) || 0;
+                    const seasonT = parseInt(fields[6]) || 0;
+                    const seasonSO = parseInt(fields[12]) || 0;
+                    const seasonGA = parseInt(fields[8]) || 0;
+                    const seasonSV = parseInt(fields[9]) || 0;
+                    
+                    const parseMinutes = (minStr) => {
+                      const parts = minStr.split(':');
+                      return parseInt(parts[0]) * 60 + parseInt(parts[1] || 0);
+                    };
+                    
+                    const existing = player.baseCareerGoalieStats || { gp: 0, min: '0:00', w: 0, l: 0, t: 0, so: 0, ga: 0, sv: 0 };
+                    const existingSeconds = parseMinutes(existing.min);
+                    const seasonSeconds = parseMinutes(seasonMin);
+                    const totalSeconds = existingSeconds + seasonSeconds;
+                    const totalMinStr = `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}`;
+                    
+                    player.baseCareerGoalieStats = {
+                      gp: existing.gp + seasonGP,
+                      min: totalMinStr,
+                      w: existing.w + seasonW,
+                      l: existing.l + seasonL,
+                      t: existing.t + seasonT,
+                      so: existing.so + seasonSO,
+                      ga: existing.ga + seasonGA,
+                      sv: existing.sv + seasonSV
+                    };
+                    
+                    console.log(`✓ Base career goalie for ${name}:`, player.baseCareerGoalieStats);
+                  }
                 }
               }
+              
+              return updatedRoster;
+            } catch (error) {
+              console.error('Error parsing career stats:', error);
+              return existingRoster;
             }
-            
-            console.log('Final roster with career stats:', updatedRoster);
-            return updatedRoster;
           };
 
           const parseTeamStats = (text) => {
-            console.log('📊 ========== PARSING TEAM STATS ==========');
-            console.log('📊 Text length:', text.length);
-            const lines = text.split('\\n').map(l => l.trim()).filter(l => l);
-            console.log('📊 Total lines:', lines.length);
-            console.log('📊 First 30 lines:', lines.slice(0, 30));
-            
-            let stats = { ppPct: 0, pkPct: 0, gpg: 0, gapg: 0 };
-            
-            // Look for the stats table header first
-            // Typical header: "TEAM GP GPG GAPG PP PPG PP% PK PKG PK% SOG SOGPG S% FOW FOL FO%"
-            let headerIdx = -1;
-            for (let i = 0; i < lines.length; i++) {
-              if (lines[i].includes('TEAM') && lines[i].includes('GPG') && lines[i].includes('GAPG')) {
-                headerIdx = i;
-                console.log('📊 Found stats header at line', i, ':', lines[i]);
-                break;
-              }
-            }
-            
-            // If we found the header, the stats line should be within the next 5 lines
-            if (headerIdx >= 0) {
-              for (let i = headerIdx + 1; i < headerIdx + 6 && i < lines.length; i++) {
-                const parts = lines[i].split(/\\s+/);
-                console.log('📊 Checking line', i, ':', lines[i]);
-                console.log('📊 Parts:', parts);
-                
-                // Look for line with team name and stats
-                // Format: TEAMNAME GP GPG GAPG PP PPG PP% PK PKG PK% ...
-                if (parts.length >= 9 && 
-                    parts[2]?.match(/^\\d+\\.\\d+$/) && 
-                    parts[3]?.match(/^\\d+\\.\\d+$/)) {
-                  stats.gpg = parseFloat(parts[2]) || 0;
-                  stats.gapg = parseFloat(parts[3]) || 0;
-                  stats.ppPct = parseFloat(parts[5]) || 0;
-                  stats.pkPct = parseFloat(parts[8]) || 0;
-                  console.log('✅ Found stats at line', i, ':', lines[i]);
-                  console.log('✅ Parsed stats:', stats);
-                  break;
-                }
-              }
-            } else {
-              // Fallback: Look for any line with the expected pattern
-              console.log('⚠️ No header found, trying fallback parsing...');
+            try {
+              console.log('📊 ========== PARSING TEAM STATS ==========');
+              const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+              
+              let stats = { ppPct: 0, pkPct: 0, gpg: 0, gapg: 0 };
+              
+              let headerIdx = -1;
               for (let i = 0; i < lines.length; i++) {
-                const parts = lines[i].split(/\\s+/);
-                
-                // Look for line starting with team name and has 9+ fields with the right pattern
-                if (parts.length >= 9 && 
-                    parts[2]?.match(/^\\d+\\.\\d+$/) && 
-                    parts[3]?.match(/^\\d+\\.\\d+$/)) {
-                  stats.gpg = parseFloat(parts[2]) || 0;
-                  stats.gapg = parseFloat(parts[3]) || 0;
-                  stats.ppPct = parseFloat(parts[5]) || 0;
-                  stats.pkPct = parseFloat(parts[8]) || 0;
-                  console.log('✅ Found stats at line (fallback):', lines[i]);
-                  console.log('✅ Parsed stats:', stats);
+                if (lines[i].includes('TEAM') && lines[i].includes('GPG') && lines[i].includes('GAPG')) {
+                  headerIdx = i;
                   break;
                 }
               }
+              
+              if (headerIdx >= 0) {
+                for (let i = headerIdx + 1; i < headerIdx + 6 && i < lines.length; i++) {
+                  const parts = lines[i].split(/\s+/);
+                  
+                  if (parts.length >= 9 && 
+                      parts[2]?.match(/^\d+\.\d+$/) && 
+                      parts[3]?.match(/^\d+\.\d+$/)) {
+                    stats.gpg = parseFloat(parts[2]) || 0;
+                    stats.gapg = parseFloat(parts[3]) || 0;
+                    stats.ppPct = parseFloat(parts[5]) || 0;
+                    stats.pkPct = parseFloat(parts[8]) || 0;
+                    console.log('✅ Found stats:', stats);
+                    break;
+                  }
+                }
+              }
+              
+              return stats;
+            } catch (error) {
+              console.error('Error parsing team stats:', error);
+              return { ppPct: 0, pkPct: 0, gpg: 0, gapg: 0 };
             }
-            
-            console.log('📊 ========== PARSE COMPLETE ==========');
-            console.log('📊 Final stats:', stats);
-            console.log('');
-            return stats;
           };
 
           const handleLogoPaste = async (isSetup, isMyTeam) => {
@@ -1354,6 +1138,7 @@
               }
               alert('No image found in clipboard.');
             } catch (err) {
+              console.error('Clipboard paste error:', err);
               alert('Unable to paste. Please use Choose File or copy an image first.');
             }
           };
@@ -1381,7 +1166,6 @@
             const text = importText;
             console.log('=== handleImport called ===');
             console.log('Current importStep:', importStep);
-            console.log('Text length:', text.length);
             
             if (importStep === 'oppLogo') {
               const currentIdx = importSteps.findIndex(s => s.key === importStep);
@@ -1393,26 +1177,15 @@
             
             try {
               if (importStep === 'myTeamHome') {
-                console.log('Parsing Home Page:', text.substring(0, 200));
                 const parsed = parseHomePage(text);
-                console.log('Parsed result:', parsed);
                 setMyTeamData(prev => ({ ...prev, ...parsed }));
               } else if (importStep === 'myTeamRoster') {
-                console.log('
- \u56549 
-  Importing MY TEAM roster...');
+                console.log('🔧 Importing MY TEAM roster...');
                 let roster = parseRoster(text, myTeamData.roster);
-                console.log('
- Roster parsed, now loading career stats from localStorage...');
-                // Auto-load career stats from localStorage
                 roster = loadCareerStatsFromStorage(roster);
-                console.log('
- Career stats loaded, updating state...');
                 setMyTeamData(prev => ({ ...prev, roster }));
               } else if (importStep === 'myTeamPlayerStats') {
-                console.log('Processing player stats...');
                 const updatedRoster = parsePlayerStats(text, myTeamData.roster);
-                console.log('Updated roster:', updatedRoster);
                 setMyTeamData(prev => ({ ...prev, roster: updatedRoster }));
               } else if (importStep === 'oppHome') {
                 const parsed = parseHomePage(text);
@@ -1434,18 +1207,15 @@
                 setShowImport(false);
               }
             } catch (error) {
-              console.error('
- Error in handleImport:', error);
-              alert(`Error importing data: ${error.message}\\nCheck console for details.`);
+              console.error('❌ Error in handleImport:', error);
+              alert(`Error importing data: ${error.message}\nCheck console for details.`);
             }
           };
 
           const handleSkipStep = () => {
-            // Save current data if any text was entered
             if (importText.trim()) {
               handleImport();
             } else {
-              // Just move to next step if no data
               setImportText('');
               const currentIdx = importSteps.findIndex(s => s.key === importStep);
               if (currentIdx < importSteps.length - 1) {
@@ -1456,104 +1226,91 @@
             }
           };
 
-            const handleBackStep = () => {
-  // Save current data if any text was entered
-  if (importText.trim()) {
-    try {
-      // Process the current step's data first
-      if (importStep === 'myTeamHome') {
-        const parsed = parseHomePage(importText);
-        setMyTeamData(prev => ({ ...prev, ...parsed }));
-      } else if (importStep === 'myTeamRoster') {
-        let roster = parseRoster(importText, myTeamData.roster);
-        roster = loadCareerStatsFromStorage(roster);
-        setMyTeamData(prev => ({ ...prev, roster }));
-      } else if (importStep === 'myTeamPlayerStats') {
-        const updatedRoster = parsePlayerStats(importText, myTeamData.roster);
-        setMyTeamData(prev => ({ ...prev, roster: updatedRoster }));
-      } else if (importStep === 'oppHome') {
-        const parsed = parseHomePage(importText);
-        setOpponentData(prev => ({ ...prev, ...parsed }));
-      } else if (importStep === 'oppRoster') {
-        const roster = parseRoster(importText, opponentData.roster);
-        setOpponentData(prev => ({ ...prev, roster }));
-      } else if (importStep === 'oppPlayerStats') {
-        const updatedRoster = parsePlayerStats(importText, opponentData.roster);
-        setOpponentData(prev => ({ ...prev, roster: updatedRoster }));
-      }
-    } catch (error) {
-      console.error('Error saving data on back:', error);
-    }
-  }
-  
-  // Then move to previous step
-  setImportText('');
-  const currentIdx = importSteps.findIndex(s => s.key === importStep);
-  if (currentIdx > 0) {
-    setImportStep(importSteps[currentIdx - 1].key);
-  } else {
-    // If at first step, go to last step (wrap around)
-    setImportStep(importSteps[importSteps.length - 1].key);
-  }
-};
+          const handleBackStep = () => {
+            if (importText.trim()) {
+              try {
+                if (importStep === 'myTeamHome') {
+                  const parsed = parseHomePage(importText);
+                  setMyTeamData(prev => ({ ...prev, ...parsed }));
+                } else if (importStep === 'myTeamRoster') {
+                  let roster = parseRoster(importText, myTeamData.roster);
+                  roster = loadCareerStatsFromStorage(roster);
+                  setMyTeamData(prev => ({ ...prev, roster }));
+                } else if (importStep === 'myTeamPlayerStats') {
+                  const updatedRoster = parsePlayerStats(importText, myTeamData.roster);
+                  setMyTeamData(prev => ({ ...prev, roster: updatedRoster }));
+                } else if (importStep === 'oppHome') {
+                  const parsed = parseHomePage(importText);
+                  setOpponentData(prev => ({ ...prev, ...parsed }));
+                } else if (importStep === 'oppRoster') {
+                  const roster = parseRoster(importText, opponentData.roster);
+                  setOpponentData(prev => ({ ...prev, roster }));
+                } else if (importStep === 'oppPlayerStats') {
+                  const updatedRoster = parsePlayerStats(importText, opponentData.roster);
+                  setOpponentData(prev => ({ ...prev, roster: updatedRoster }));
+                }
+              } catch (error) {
+                console.error('Error saving data on back:', error);
+              }
+            }
+            
+            setImportText('');
+            const currentIdx = importSteps.findIndex(s => s.key === importStep);
+            if (currentIdx > 0) {
+              setImportStep(importSteps[currentIdx - 1].key);
+            } else {
+              setImportStep(importSteps[importSteps.length - 1].key);
+            }
+          };
 
-const handleSaveAndClose = () => {
-  // Save current data if any text was entered
-  if (importText.trim()) {
-    try {
-      // Process the current step's data
-      if (importStep === 'myTeamHome') {
-        const parsed = parseHomePage(importText);
-        setMyTeamData(prev => ({ ...prev, ...parsed }));
-      } else if (importStep === 'myTeamRoster') {
-        let roster = parseRoster(importText, myTeamData.roster);
-        roster = loadCareerStatsFromStorage(roster);
-        setMyTeamData(prev => ({ ...prev, roster }));
-      } else if (importStep === 'myTeamPlayerStats') {
-        const updatedRoster = parsePlayerStats(importText, myTeamData.roster);
-        setMyTeamData(prev => ({ ...prev, roster: updatedRoster }));
-      } else if (importStep === 'oppHome') {
-        const parsed = parseHomePage(importText);
-        setOpponentData(prev => ({ ...prev, ...parsed }));
-      } else if (importStep === 'oppRoster') {
-        const roster = parseRoster(importText, opponentData.roster);
-        setOpponentData(prev => ({ ...prev, roster }));
-      } else if (importStep === 'oppPlayerStats') {
-        const updatedRoster = parsePlayerStats(importText, opponentData.roster);
-        setOpponentData(prev => ({ ...prev, roster: updatedRoster }));
-      }
-    } catch (error) {
-      console.error('Error saving data on close:', error);
-    }
-  }
-  
-  // Clear and close
-  setImportText('');
-  setShowImport(false);
-};
+          const handleSaveAndClose = () => {
+            if (importText.trim()) {
+              try {
+                if (importStep === 'myTeamHome') {
+                  const parsed = parseHomePage(importText);
+                  setMyTeamData(prev => ({ ...prev, ...parsed }));
+                } else if (importStep === 'myTeamRoster') {
+                  let roster = parseRoster(importText, myTeamData.roster);
+                  roster = loadCareerStatsFromStorage(roster);
+                  setMyTeamData(prev => ({ ...prev, roster }));
+                } else if (importStep === 'myTeamPlayerStats') {
+                  const updatedRoster = parsePlayerStats(importText, myTeamData.roster);
+                  setMyTeamData(prev => ({ ...prev, roster: updatedRoster }));
+                } else if (importStep === 'oppHome') {
+                  const parsed = parseHomePage(importText);
+                  setOpponentData(prev => ({ ...prev, ...parsed }));
+                } else if (importStep === 'oppRoster') {
+                  const roster = parseRoster(importText, opponentData.roster);
+                  setOpponentData(prev => ({ ...prev, roster }));
+                } else if (importStep === 'oppPlayerStats') {
+                  const updatedRoster = parsePlayerStats(importText, opponentData.roster);
+                  setOpponentData(prev => ({ ...prev, roster: updatedRoster }));
+                }
+              } catch (error) {
+                console.error('Error saving data on close:', error);
+              }
+            }
+            
+            setImportText('');
+            setShowImport(false);
+          };
 
           const handlePlayerClick = (player, source) => {
-            console.log('
- \u56629 
-  PLAYER CLICKED:', player.name, source);
+            console.log('👆 PLAYER CLICKED:', player.name, source);
             setSelectedPlayer({ player, source });
           };
 
           const handleSlotClick = (line, position) => {
-            console.log('
- \u57314 
-  SLOT CLICKED:', line, position);
+            console.log('🎯 SLOT CLICKED:', line, position);
             if (!selectedPlayer) return;
             
             const newLines = { ...lines };
             const { player, source } = selectedPlayer;
             
-            // Remove from old position if it was in lines
             if (source && source.line) {
               newLines[source.line][source.position] = null;
             }
             
-            // Swap if slot occupied
             const existingPlayer = newLines[line][position];
             newLines[line][position] = player;
             
@@ -1569,7 +1326,6 @@ const handleSaveAndClose = () => {
             setLines({ ...lines, [line]: { ...lines[line], color } });
           };
 
-          // Helper function to convert numeric grade to text
           const convertGradeToText = (grade) => {
             if (grade === 12 || grade === '12th' || grade === '12') return 'Senior';
             if (grade === 11 || grade === '11th' || grade === '11') return 'Junior';
@@ -1578,6 +1334,162 @@ const handleSaveAndClose = () => {
             return grade;
           };
 
+          const handleCareerStatsImport = () => {
+            try {
+              const allSeasons = [
+                careerStatsImport.lastSeason,
+                careerStatsImport.twoSeasonsAgo,
+                careerStatsImport.threeSeasonsAgo
+              ].filter(s => s.trim());
+              
+              if (allSeasons.length === 0) {
+                alert('Please paste at least one season of stats before importing.');
+                return;
+              }
+              
+              const careerData = {};
+              
+              allSeasons.forEach((seasonText, seasonIdx) => {
+                console.log(`📊 Processing season ${seasonIdx + 1}...`);
+                const lines = seasonText.split('\n').map(l => l.trim()).filter(l => l);
+                
+                let inSkaterSection = false;
+                let inGoalieSection = false;
+                
+                for (let i = 0; i < lines.length; i++) {
+                  const line = lines[i];
+                  
+                  if (line === 'Skater') {
+                    inSkaterSection = true;
+                    inGoalieSection = false;
+                    continue;
+                  }
+                  if (line === 'Goalie') {
+                    inSkaterSection = false;
+                    inGoalieSection = true;
+                    continue;
+                  }
+                  
+                  if (line === '#' || line === 'Name' || line === 'GP' || line.includes('AVG PTS')) continue;
+                  
+                  const fields = line.split('\t').filter(f => f.trim());
+                  
+                  if (fields.length < 3) continue;
+                  
+                  const number = fields[0];
+                  const name = fields[1];
+                  
+                  if (!/^\d+$/.test(number)) continue;
+                  
+                  const nameParts = name.trim().split(/\s+/);
+                  const firstInitial = nameParts[0]?.charAt(0)?.toUpperCase() || '';
+                  const lastName = nameParts[nameParts.length - 1]?.toUpperCase() || '';
+                  const key = `${lastName}_${firstInitial}`;
+                  
+                  if (inSkaterSection && fields.length >= 6) {
+                    const seasonGP = parseInt(fields[2]) || 0;
+                    const seasonG = parseInt(fields[3]) || 0;
+                    const seasonA = parseInt(fields[4]) || 0;
+                    const seasonPts = parseInt(fields[5]) || 0;
+                    const seasonPlusMinus = parseInt(fields[19]) || 0;
+                    const seasonFOW = parseInt(fields[14]) || 0;
+                    const seasonFOL = parseInt(fields[15]) || 0;
+                    
+                    if (careerData[key]?.type === 'goalie') {
+                      console.log(`⚠️ Skipping skater stats for ${name} - already saved as goalie`);
+                      continue;
+                    }
+                    
+                    if (!careerData[key]) {
+                      careerData[key] = {
+                        type: 'skater',
+                        data: { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0, fow: 0, fol: 0 }
+                      };
+                    }
+                    
+                    careerData[key].data.gp += seasonGP;
+                    careerData[key].data.g += seasonG;
+                    careerData[key].data.a += seasonA;
+                    careerData[key].data.pts += seasonPts;
+                    careerData[key].data.plusMinus += seasonPlusMinus;
+                    careerData[key].data.fow += seasonFOW;
+                    careerData[key].data.fol += seasonFOL;
+                    
+                    console.log(`✓ Added skater career for ${name} (${key}):`, careerData[key].data);
+                  } else if (inGoalieSection && fields.length >= 10) {
+                    const seasonGP = parseInt(fields[2]) || 0;
+                    const seasonMin = fields[3] || '0:00';
+                    const seasonW = parseInt(fields[4]) || 0;
+                    const seasonL = parseInt(fields[5]) || 0;
+                    const seasonT = parseInt(fields[6]) || 0;
+                    const seasonSO = parseInt(fields[12]) || 0;
+                    const seasonGA = parseInt(fields[8]) || 0;
+                    const seasonSV = parseInt(fields[9]) || 0;
+                    
+                    if (careerData[key]?.type === 'skater') {
+                      console.log(`🔄 Converting ${name} from skater to goalie`);
+                    }
+                    
+                    if (!careerData[key] || careerData[key].type !== 'goalie') {
+                      careerData[key] = {
+                        type: 'goalie',
+                        data: { gp: 0, min: '0:00', w: 0, l: 0, t: 0, so: 0, ga: 0, sv: 0 }
+                      };
+                    }
+                    
+                    const seasonMinStr = seasonMin || '0:00';
+                    const seasonMinParts = seasonMinStr.toString().split(':');
+                    const minMinutes = parseInt(seasonMinParts[0]) || 0;
+                    const minSeconds = parseInt(seasonMinParts[1]) || 0;
+                    const totalSeasonSeconds = minMinutes * 60 + minSeconds;
+                    
+                    const existingMinStr = careerData[key].data.min || '0:00';
+                    const existingMinParts = existingMinStr.toString().split(':');
+                    const existingMinutes = parseInt(existingMinParts[0]) || 0;
+                    const existingSeconds = parseInt(existingMinParts[1]) || 0;
+                    const existingTotalSeconds = existingMinutes * 60 + existingSeconds;
+                    
+                    const newTotalSeconds = existingTotalSeconds + totalSeasonSeconds;
+                    const newMinutes = Math.floor(newTotalSeconds / 60);
+                    const newSeconds = newTotalSeconds % 60;
+                    
+                    careerData[key].data.gp += seasonGP;
+                    careerData[key].data.min = `${newMinutes}:${String(newSeconds).padStart(2, '0')}`;
+                    careerData[key].data.w += seasonW;
+                    careerData[key].data.l += seasonL;
+                    careerData[key].data.t += seasonT;
+                    careerData[key].data.so += seasonSO;
+                    careerData[key].data.ga += seasonGA;
+                    careerData[key].data.sv += seasonSV;
+                    
+                    console.log(`✓ Added goalie career for ${name} (${key}):`, careerData[key].data);
+                  }
+                }
+              });
+              
+              localStorage.setItem('hockey-scout-career-stats', JSON.stringify(careerData));
+              console.log('💾 Saved career stats to localStorage:', Object.keys(careerData).length, 'players');
+              
+              alert(`✓ Successfully imported career stats for ${Object.keys(careerData).length} players!\n\n💾 Career stats saved to browser storage and will automatically load when you import your roster.`);
+            } catch (error) {
+              console.error('Career stats import error:', error);
+              alert(`Error importing career stats: ${error.message}`);
+            }
+          };
+
+          const totalCoachRecord = {
+            w: (myTeamData.headCoach.careerRecord.w || 0) + myTeamData.record.w,
+            l: (myTeamData.headCoach.careerRecord.l || 0) + myTeamData.record.l,
+            t: (myTeamData.headCoach.careerRecord.t || 0) + myTeamData.record.t
+          };
+          
+          const totalOppCoachRecord = {
+            w: (opponentData.headCoach.careerRecord.w || 0) + opponentData.record.w,
+            l: (opponentData.headCoach.careerRecord.l || 0) + opponentData.record.l,
+            t: (opponentData.headCoach.careerRecord.t || 0) + opponentData.record.t
+          };
+
+          // Player Card Component
           const PlayerCard = ({ player, source, compact = false, isPreview = false }) => {
             if (!player) return null;
             
@@ -1586,10 +1498,8 @@ const handleSaveAndClose = () => {
             const nameRef = React.useRef(null);
             const pronunciationRef = React.useRef(null);
             
-            // Look up pronunciation from myTeamSetup.pronunciations using player's last name
             const pronunciation = myTeamSetup.pronunciations[player.lastName] || '';
             
-            // Ensure stats object exists with defaults
             const stats = player.stats || { gp: 0, g: 0, a: 0, pts: 0, pim: 0, plusMinus: 0, fow: 0, fol: 0 };
             const careerStats = player.careerStats || { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0, faceoffPct: '0.0', pim: 0 };
             const goalieStats = player.goalieStats || { gp: 0, min: '0:00', w: 0, l: 0, t: 0, ga: 0, sv: 0, gaa: 0, svp: '.000', so: 0, pim: 0 };
@@ -1597,44 +1507,35 @@ const handleSaveAndClose = () => {
             
             const isGoalie = player.position === 'G';
             
-            // Calculate faceoff percentage for current season
             const faceoffPct = stats.fow + stats.fol > 0 
               ? ((stats.fow / (stats.fow + stats.fol)) * 100).toFixed(1)
               : '0.0';
             
-            // Helper: Convert grade to text
             const getGradeLabel = (grade) => {
               const gradeMap = { '9': 'Freshman', '10': 'Sophomore', '11': 'Junior', '12': 'Senior' };
               return gradeMap[grade] || grade;
             };
             
-            // Helper: Format plus/minus with sign
             const formatPlusMinus = (value) => {
               if (!value || value === 0) return '+0';
               return value > 0 ? `+${value}` : `${value}`;
             };
             
             const gradeText = getGradeLabel(player.grade);
-            
-            // Build grade display with DOB year: "Senior - 2007"
             const gradeDisplay = player.dobYear ? `${gradeText} - ${player.dobYear}` : gradeText;
             
-            // Position text - for goalies, show "Left Catch" or "Right Catch"
             const positionText = isGoalie 
               ? `${player.shoots === 'L' ? 'Left' : 'Right'} Catch`
               : player.handed === 'L' ? 'Left' : player.handed === 'R' ? 'Right' : '';
             
             const isSelected = selectedPlayer?.player.id === player.id;
             
-            // Font sizes - stat-based hierarchy
-            // For preview cards, use 0.3125 of normal size (was 0.25, increased by 25%)
             const fontScale = isPreview ? 0.3125 : 1;
-            const statFontSize = `${8 * fontScale}pt`; // Same for all positions
-            const nameFontSize = `${30 * fontScale}pt`; // 30pt for both goalies and skaters
-            const infoFontSize = statFontSize; // handed, grade same as stats
+            const statFontSize = `${8 * fontScale}pt`;
+            const nameFontSize = `${30 * fontScale}pt`;
+            const infoFontSize = statFontSize;
             const pronunciationFontSize = `${10 * fontScale}pt`;
             
-            // Auto-resize text effect
             React.useEffect(() => {
               const resizeText = (element, maxSize, minSize = 8) => {
                 if (!element) return;
@@ -1650,25 +1551,22 @@ const handleSaveAndClose = () => {
                 }
               };
               
-              // Resize jersey number - scale ranges for preview cards
               if (numberRef.current) {
-                const maxNumberSize = isPreview ? 32.8125 : 105; // 105 * 0.3125 = 32.8125
-                const minNumberSize = isPreview ? 12.5 : 40;    // 40 * 0.3125 = 12.5
+                const maxNumberSize = isPreview ? 32.8125 : 105;
+                const minNumberSize = isPreview ? 12.5 : 40;
                 resizeText(numberRef.current, maxNumberSize, minNumberSize);
               }
               
-              // Resize player name - be more conservative to ensure it shows
               if (nameRef.current) {
-                const baseMaxSize = 30; // Now 30pt for both goalies and skaters
+                const baseMaxSize = 30;
                 const maxNameSize = isPreview ? baseMaxSize * 0.3125 : baseMaxSize;
-                const minNameSize = isPreview ? 3.125 : 10; // 10 * 0.3125 = 3.125
+                const minNameSize = isPreview ? 3.125 : 10;
                 resizeText(nameRef.current, maxNameSize, minNameSize);
               }
               
-              // Resize pronunciation to fit on one line
               if (pronunciationRef.current && pronunciation) {
-                const maxPronunciationSize = isPreview ? 10 * 0.3125 : 10; // 10pt base
-                const minPronunciationSize = isPreview ? 2 : 6; // Min 6pt to stay readable
+                const maxPronunciationSize = isPreview ? 10 * 0.3125 : 10;
+                const minPronunciationSize = isPreview ? 2 : 6;
                 resizeText(pronunciationRef.current, maxPronunciationSize, minPronunciationSize);
               }
             }, [player.number, player.name, pronunciation, isGoalie, isPreview]);
@@ -1689,7 +1587,6 @@ const handleSaveAndClose = () => {
                   fontFamily: "'Arial Narrow', Arial, sans-serif"
                 }}
               >
-                {/* LEFT SIDE: Jersey Number + Pronunciation */}
                 <div style={{ 
                   width: '35%',
                   display: 'flex',
@@ -1699,7 +1596,6 @@ const handleSaveAndClose = () => {
                   borderRight: '2px solid #333',
                   paddingRight: '2px'
                 }}>
-                  {/* Jersey Number - Auto-sizing from 110pt down to 40pt */}
                   <div 
                     ref={numberRef}
                     style={{ 
@@ -1714,7 +1610,6 @@ const handleSaveAndClose = () => {
                     {player.number}
                   </div>
                   
-                  {/* Pronunciation - 10pt italic */}
                   {pronunciation && (
                     <div 
                       ref={pronunciationRef}
@@ -1733,7 +1628,6 @@ const handleSaveAndClose = () => {
                   )}
                 </div>
                 
-                {/* RIGHT SIDE: Player Info & Stats */}
                 <div style={{ 
                   width: '65%',
                   paddingLeft: '4px',
@@ -1743,7 +1637,6 @@ const handleSaveAndClose = () => {
                   justifyContent: 'flex-start',
                   gap: '1px'
                 }}>
-                  {/* Player Name - 2x stat size, BOLD, centered, NO WRAP */}
                   <div 
                     ref={nameRef}
                     style={{ 
@@ -1759,7 +1652,6 @@ const handleSaveAndClose = () => {
                     {player.name}
                   </div>
                   
-                  {/* Position and Grade Row - same size as stats */}
                   <div style={{ 
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -1771,10 +1663,8 @@ const handleSaveAndClose = () => {
                     <div style={{ textAlign: 'right' }}>{gradeDisplay}</div>
                   </div>
                   
-                  {/* SKATER STATS - 4 LINES FIXED */}
                   {!isGoalie ? (
                     <>
-                      {/* Line 1: Current Season GP/G-A-PTS - BOLD */}
                       <div style={{ 
                         fontSize: statFontSize,
                         fontWeight: 'bold',
@@ -1785,7 +1675,6 @@ const handleSaveAndClose = () => {
                         25-26: GP:{stats.gp}  {stats.g}-{stats.a}--{stats.pts}
                       </div>
                       
-                      {/* Line 2: Current Season PIM/+/-/Faceoff - BOLD */}
                       <div style={{ 
                         fontSize: statFontSize,
                         fontWeight: 'bold',
@@ -1796,7 +1685,6 @@ const handleSaveAndClose = () => {
                         PIM: {stats.pim} +/- {formatPlusMinus(stats.plusMinus)} Faceoff {faceoffPct}%
                       </div>
                       
-                      {/* Line 3: Career GP/G-A-PTS - Regular */}
                       <div style={{ 
                         fontSize: statFontSize,
                         lineHeight: '1.0',
@@ -1806,7 +1694,6 @@ const handleSaveAndClose = () => {
                         Career GP:{careerStats.gp}  {careerStats.g}-{careerStats.a}--{careerStats.pts}
                       </div>
                       
-                      {/* Line 4: Career PIM/+/-/Faceoff - Regular */}
                       <div style={{ 
                         fontSize: statFontSize,
                         lineHeight: '1.0',
@@ -1817,9 +1704,7 @@ const handleSaveAndClose = () => {
                       </div>
                     </>
                   ) : (
-                    /* GOALIE STATS - 4 LINES FIXED */
                     <>
-                      {/* Line 1: Current Season MIN/GAA - BOLD */}
                       <div style={{ 
                         fontSize: statFontSize,
                         fontWeight: 'bold',
@@ -1830,7 +1715,6 @@ const handleSaveAndClose = () => {
                         25-26: MIN {goalieStats.min} GAA: {goalieStats.gaa.toFixed(2)}
                       </div>
                       
-                      {/* Line 2: Current Season PIM/W-L-T/S% - BOLD */}
                       <div style={{ 
                         fontSize: statFontSize,
                         fontWeight: 'bold',
@@ -1841,7 +1725,6 @@ const handleSaveAndClose = () => {
                         PIM: {goalieStats.pim || 0} {goalieStats.w}-{goalieStats.l}-{goalieStats.t} ({goalieStats.so}) S% {goalieStats.svp}
                       </div>
                       
-                      {/* Line 3: Career MIN/GAA - Regular */}
                       <div style={{ 
                         fontSize: statFontSize,
                         lineHeight: '1.0',
@@ -1851,7 +1734,6 @@ const handleSaveAndClose = () => {
                         Career: MIN {careerGoalieStats.min} GAA: {careerGoalieStats.gaa.toFixed(2)}
                       </div>
                       
-                      {/* Line 4: Career PIM/W-L-T/S% - Regular */}
                       <div style={{ 
                         fontSize: statFontSize,
                         lineHeight: '1.0',
@@ -1867,6 +1749,7 @@ const handleSaveAndClose = () => {
             );
           };
 
+          // Line Slot Component
           const LineSlot = ({ line, position, label, showLabel = false }) => {
             const player = lines[line][position];
             const isTargeted = selectedPlayer && !player;
@@ -1909,211 +1792,11 @@ const handleSaveAndClose = () => {
 
           const availablePlayers = myTeamData.roster.filter(p => !getPlayersInLines().has(p.id));
           const currentStepInfo = importSteps.find(s => s.key === importStep);
-          
-          const normalizeFirstName = (name) => {
-            const variations = {
-              'joe': 'joseph', 'joseph': 'joe',
-              'mike': 'michael', 'michael': 'mike',
-              'dan': 'daniel', 'daniel': 'dan',
-              'matt': 'matthew', 'matthew': 'matt',
-              'rob': 'robert', 'robert': 'rob',
-              'tom': 'thomas', 'thomas': 'tom',
-              'jim': 'james', 'james': 'jim',
-              'will': 'william', 'william': 'will',
-              'chris': 'christopher', 'christopher': 'chris',
-              'nick': 'nicholas', 'nicholas': 'nick'
-            };
-            const lower = name.toLowerCase();
-            return variations[lower] ? [lower, variations[lower]] : [lower];
-          };
 
-          const handleCareerStatsImport = () => {
-            try {
-              // Combine all seasons into one import (they'll accumulate)
-              const allSeasons = [
-                careerStatsImport.lastSeason,
-                careerStatsImport.twoSeasonsAgo,
-                careerStatsImport.threeSeasonsAgo
-              ].filter(s => s.trim());
-              
-              if (allSeasons.length === 0) {
-                alert('Please paste at least one season of stats before importing.');
-                return;
-              }
-              
-              // Parse career stats directly into storage format (no roster needed!)
-              const careerData = {};
-              
-              allSeasons.forEach((seasonText, seasonIdx) => {
-                console.log(`
- \u56522 
-  Processing season ${seasonIdx + 1}...`);
-                const lines = seasonText.split('\\n').map(l => l.trim()).filter(l => l);
-                
-                let inSkaterSection = false;
-                let inGoalieSection = false;
-                
-                for (let i = 0; i < lines.length; i++) {
-                  const line = lines[i];
-                  
-                  // Detect sections
-                  if (line === 'Skater') {
-                    inSkaterSection = true;
-                    inGoalieSection = false;
-                    continue;
-                  }
-                  if (line === 'Goalie') {
-                    inSkaterSection = false;
-                    inGoalieSection = true;
-                    continue;
-                  }
-                  
-                  // Skip headers
-                  if (line === '#' || line === 'Name' || line === 'GP' || line.includes('AVG PTS')) continue;
-                  
-                  // Split by tabs
-                  const fields = line.split('\\t').filter(f => f.trim());
-                  
-                  // Need at least player number and name
-                  if (fields.length < 3) continue;
-                  
-                  const number = fields[0];
-                  const name = fields[1];
-                  
-                  // Must start with a digit
-                  if (!/^\\d+$/.test(number)) continue;
-                  
-                  // Extract last name and first initial
-                  const nameParts = name.trim().split(/\\s+/);
-                  const firstInitial = nameParts[0]?.charAt(0)?.toUpperCase() || '';
-                  const lastName = nameParts[nameParts.length - 1]?.toUpperCase() || '';
-                  const key = `${lastName}_${firstInitial}`;
-                  
-                  if (inSkaterSection && fields.length >= 6) {
-                    const seasonGP = parseInt(fields[2]) || 0;
-                    const seasonG = parseInt(fields[3]) || 0;
-                    const seasonA = parseInt(fields[4]) || 0;
-                    const seasonPts = parseInt(fields[5]) || 0;
-                    const seasonPlusMinus = parseInt(fields[19]) || 0;
-                    const seasonFOW = parseInt(fields[14]) || 0;
-                    const seasonFOL = parseInt(fields[15]) || 0;
-                    
-                    // Skip if this player already exists as a goalie (goalies can appear in skater section with 0 stats)
-                    if (careerData[key]?.type === 'goalie') {
-                      console.log(`
- \u65039 
-  Skipping skater stats for ${name} - already saved as goalie`);
-                      continue;
-                    }
-                    
-                    // Accumulate across multiple seasons
-                    if (!careerData[key]) {
-                      careerData[key] = {
-                        type: 'skater',
-                        data: { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0, fow: 0, fol: 0 }
-                      };
-                    }
-                    
-                    careerData[key].data.gp += seasonGP;
-                    careerData[key].data.g += seasonG;
-                    careerData[key].data.a += seasonA;
-                    careerData[key].data.pts += seasonPts;
-                    careerData[key].data.plusMinus += seasonPlusMinus;
-                    careerData[key].data.fow += seasonFOW;
-                    careerData[key].data.fol += seasonFOL;
-                    
-                    console.log(`
- Added skater career for ${name} (${key}):`, careerData[key].data);
-                  } else if (inGoalieSection && fields.length >= 10) {
-                    const seasonGP = parseInt(fields[2]) || 0;
-                    const seasonMin = fields[3] || '0:00';
-                    const seasonW = parseInt(fields[4]) || 0;
-                    const seasonL = parseInt(fields[5]) || 0;
-                    const seasonT = parseInt(fields[6]) || 0;
-                    const seasonSO = parseInt(fields[12]) || 0;  // SO is field 12
-                    const seasonGA = parseInt(fields[8]) || 0;
-                    const seasonSV = parseInt(fields[9]) || 0;
-                    
-                    // GOALIE ALWAYS OVERWRITES SKATER - Convert any existing skater data to goalie
-                    if (careerData[key]?.type === 'skater') {
-                      console.log(`
- \u56580 
-  Converting ${name} from skater to goalie`);
-                    }
-                    
-                    // Accumulate across multiple seasons (or initialize if first time OR converting from skater)
-                    if (!careerData[key] || careerData[key].type !== 'goalie') {
-                      careerData[key] = {
-                        type: 'goalie',
-                        data: { gp: 0, min: '0:00', w: 0, l: 0, t: 0, so: 0, ga: 0, sv: 0 }
-                      };
-                    }
-                    
-                    // Parse minutes safely
-                    const seasonMinStr = seasonMin || '0:00';
-                    const seasonMinParts = seasonMinStr.toString().split(':');
-                    const minMinutes = parseInt(seasonMinParts[0]) || 0;
-                    const minSeconds = parseInt(seasonMinParts[1]) || 0;
-                    const totalSeasonSeconds = minMinutes * 60 + minSeconds;
-                    
-                    const existingMinStr = careerData[key].data.min || '0:00';
-                    const existingMinParts = existingMinStr.toString().split(':');
-                    const existingMinutes = parseInt(existingMinParts[0]) || 0;
-                    const existingSeconds = parseInt(existingMinParts[1]) || 0;
-                    const existingTotalSeconds = existingMinutes * 60 + existingSeconds;
-                    
-                    const newTotalSeconds = existingTotalSeconds + totalSeasonSeconds;
-                    const newMinutes = Math.floor(newTotalSeconds / 60);
-                    const newSeconds = newTotalSeconds % 60;
-                    
-                    careerData[key].data.gp += seasonGP;
-                    careerData[key].data.min = `${newMinutes}:${String(newSeconds).padStart(2, '0')}`;
-                    careerData[key].data.w += seasonW;
-                    careerData[key].data.l += seasonL;
-                    careerData[key].data.t += seasonT;
-                    careerData[key].data.so += seasonSO;
-                    careerData[key].data.ga += seasonGA;
-                    careerData[key].data.sv += seasonSV;
-                    
-                    console.log(`
- Added goalie career for ${name} (${key}):`, careerData[key].data);
-                  }
-                }
-              });
-              
-              // Save directly to localStorage
-              localStorage.setItem('hockey-scout-career-stats', JSON.stringify(careerData));
-              console.log('
- \u56510 
-  Saved career stats to localStorage:', Object.keys(careerData).length, 'players');
-              console.log('
- \u56510 
-  Career data keys:', Object.keys(careerData));
-              
-              alert(`
- Successfully imported career stats for ${Object.keys(careerData).length} players!\\n\\n
- \u56510 
-  Career stats saved to browser storage and will automatically load when you import your roster.`);
-            } catch (error) {
-              console.error('Career stats import error:', error);
-              alert(`Error importing career stats: ${error.message}`);
-            }
-          };
-          
-          const totalCoachRecord = {
-            w: (myTeamData.headCoach.careerRecord.w || 0) + myTeamData.record.w,
-            l: (myTeamData.headCoach.careerRecord.l || 0) + myTeamData.record.l,
-            t: (myTeamData.headCoach.careerRecord.t || 0) + myTeamData.record.t
-          };
-          
-          const totalOppCoachRecord = {
-            w: (opponentData.headCoach.careerRecord.w || 0) + opponentData.record.w,
-            l: (opponentData.headCoach.careerRecord.l || 0) + opponentData.record.l,
-            t: (opponentData.headCoach.careerRecord.t || 0) + opponentData.record.t
-          };
-
+          // Main Render
           return (
             <div className="min-h-screen bg-gray-50">
+              {/* Setup Modal */}
               {showSetup && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                   <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -2184,7 +1867,6 @@ const handleSaveAndClose = () => {
                     <div className="border-t px-6 py-4 flex justify-end">
                       <button
                         onClick={() => {
-                          // Save to localStorage with correct key
                           localStorage.setItem('myTeamSetup', JSON.stringify(myTeamSetup));
                           setShowSetup(false);
                         }}
@@ -2197,6 +1879,7 @@ const handleSaveAndClose = () => {
                 </div>
               )}
 
+              {/* Career Stats Modal */}
               {showCareerStats && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                   <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -2220,8 +1903,7 @@ const handleSaveAndClose = () => {
                                 onClick={() => openHelp('careerStats', getSeasonYears().season1)}
                                 className="text-blue-600 hover:text-blue-800 text-xs font-semibold"
                               >
- \u65039 
-  Help
+                                ❓ Help
                               </button>
                             </div>
                             <textarea
@@ -2240,8 +1922,7 @@ const handleSaveAndClose = () => {
                                 onClick={() => openHelp('careerStats', getSeasonYears().season2)}
                                 className="text-blue-600 hover:text-blue-800 text-xs font-semibold"
                               >
- \u65039 
-  Help
+                                ❓ Help
                               </button>
                             </div>
                             <textarea
@@ -2260,8 +1941,7 @@ const handleSaveAndClose = () => {
                                 onClick={() => openHelp('careerStats', getSeasonYears().season3)}
                                 className="text-blue-600 hover:text-blue-800 text-xs font-semibold"
                               >
- \u65039 
-  Help
+                                ❓ Help
                               </button>
                             </div>
                             <textarea
@@ -2291,6 +1971,7 @@ const handleSaveAndClose = () => {
                 </div>
               )}
 
+              {/* Pronunciations Modal */}
               {showPronunciations && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                   <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -2328,16 +2009,13 @@ const handleSaveAndClose = () => {
                             </div>
                           ))}
                         </div>
-                        <p className="text-xs text-gray-500 mt-2">
- \u56481 
-  Pronunciations are saved by last name and will auto-apply to future rosters</p>
+                        <p className="text-xs text-gray-500 mt-2">💡 Pronunciations are saved by last name and will auto-apply to future rosters</p>
                       </div>
                     </div>
                     
                     <div className="border-t px-6 py-4 flex justify-end">
                       <button
                         onClick={() => {
-                          // Save to localStorage with correct key
                           localStorage.setItem('myTeamSetup', JSON.stringify(myTeamSetup));
                           setShowPronunciations(false);
                         }}
@@ -2350,6 +2028,8 @@ const handleSaveAndClose = () => {
                 </div>
               )}
 
+              {/* Import Modal - COMPLETE */}
+              {/* Import Modal */}
               {showImport && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                   <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
@@ -2402,55 +2082,6 @@ const handleSaveAndClose = () => {
                             </div>
                           </div>
                         </div>
-                      ) : isSpreadsheetStep(importStep) ? (
-                        <div>
-                          <label className="block text-sm font-semibold mb-2">
-                            Paste player stats from Legacy Hockey
-                          </label>
-                          <p className="text-xs text-gray-600 mb-3">
-                            Go to Player Stats page 
- Select all (Ctrl+A) 
- Copy (Ctrl+C) 
- Paste below (Ctrl+V)
-                          </p>
-                          <textarea
-                            value={importText}
-                            onChange={(e) => {
-                              setImportText(e.target.value);
-                              if (e.target.value) handleSpreadsheetPaste(e.target.value);
-                            }}
-                            placeholder="Paste player stats table here..."
-                            className="w-full border rounded px-3 py-2 font-mono text-xs mb-3"
-                            rows="3"
-                          />
-                          
-                          {spreadsheetData.length > 0 && (
-                            <div className="border rounded overflow-auto" style={{ maxHeight: '400px' }}>
-                              <table className="w-full text-xs">
-                                <thead className="bg-gray-100 sticky top-0">
-                                  <tr>
-                                    {spreadsheetHeaders.map((header, idx) => (
-                                      <th key={idx} className="border px-2 py-1 text-left font-semibold">
-                                        {header}
-                                      </th>
-                                    ))}
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {spreadsheetData.map((row, rowIdx) => (
-                                    <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                      {row.map((cell, cellIdx) => (
-                                        <td key={cellIdx} className="border px-2 py-1">
-                                          {cell}
-                                        </td>
-                                      ))}
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
-                        </div>
                       ) : (
                         <div>
                           <div className="flex items-center justify-between mb-2">
@@ -2461,8 +2092,7 @@ const handleSaveAndClose = () => {
                               onClick={() => openHelp(importStep)}
                               className="text-blue-600 hover:text-blue-800 text-xs font-semibold"
                             >
- \u65039 
-  Help
+                              ❓ Help
                             </button>
                           </div>
                           <textarea
@@ -2485,11 +2115,9 @@ const handleSaveAndClose = () => {
                       </button>
                       <button
                         onClick={() => {
-                          // Save current data
                           if (importText.trim()) {
                             handleImport();
                           } else {
-                            // If no data, just move to next step or close
                             const currentIdx = importSteps.findIndex(s => s.key === importStep);
                             if (currentIdx < importSteps.length - 1) {
                               setImportStep(importSteps[currentIdx + 1].key);
@@ -2507,6 +2135,7 @@ const handleSaveAndClose = () => {
                 </div>
               )}
 
+              {/* Color Picker Modal */}
               {showColorPicker && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                   <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
@@ -2550,6 +2179,7 @@ const handleSaveAndClose = () => {
                 </div>
               )}
 
+              {/* Help Modal */}
               {showHelp && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                   <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
@@ -2580,6 +2210,7 @@ const handleSaveAndClose = () => {
                 </div>
               )}
 
+              {/* Navigation Bar */}
               <div className="no-print text-white p-3 shadow-lg sticky top-0 z-50" style={{ backgroundColor: '#2c4b7d' }}>
                 <div className="max-w-7xl mx-auto flex justify-between items-center">
                   <div className="flex items-center gap-3">
@@ -2602,8 +2233,7 @@ const handleSaveAndClose = () => {
                       <Upload size={16} /> Import Next Game Data
                     </button>
                     <button onClick={() => setShowColorPicker(!showColorPicker)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 text-sm font-semibold">
- \u57256 
-  Opponent Colors
+                      🎨 Opponent Colors
                     </button>
                     <button onClick={() => window.print()} className="bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 flex items-center gap-1 text-sm font-semibold">
                       <Printer size={16} /> Print
@@ -2612,6 +2242,7 @@ const handleSaveAndClose = () => {
                 </div>
               </div>
 
+              {/* Print Page 1 */}
               <div className="print-page-1 bg-white p-0 max-w-7xl mx-auto" style={{ maxWidth: '7.875in' }}>
                 {/* New 7-Column Header */}
                 <div className="rounded-lg overflow-hidden mb-0" style={{ 
@@ -2661,7 +2292,6 @@ const handleSaveAndClose = () => {
 
                   {/* C2 (12%) - MY TEAM LOGO/COACH/RECORD */}
                   <div className="flex flex-col items-center text-center gap-1">
-                    {/* Logo box - taller with gray background and two-color frame */}
                     <div className="flex items-center justify-center" style={{ 
                       width: '100%', 
                       height: '85px',
@@ -2675,7 +2305,6 @@ const handleSaveAndClose = () => {
                         <img src={myTeamSetup.logo} alt="Team" className="object-contain" style={{ maxHeight: '77px', width: '100%' }} />
                       )}
                     </div>
-                    {/* Coach info */}
                     <div className="flex flex-col">
                       <div style={{ fontSize: 'clamp(10px, 1.1vw, 13px)' }} className="font-bold">{myTeamData.headCoach.name}</div>
                       <div style={{ fontSize: 'clamp(7px, 0.8vw, 9px)' }} className="text-gray-600">(Career: {totalCoachRecord.w}-{totalCoachRecord.l}-{totalCoachRecord.t})</div>
@@ -2710,10 +2339,8 @@ const handleSaveAndClose = () => {
 
                   {/* C4 (24%) - CENTER: TEAM NAMES GRID + GAME INFO */}
                   <div className="flex flex-col justify-between">
-                    {/* Top: Light gray grid (3x4 space 2x4) */}
                     <div className="bg-gray-100 rounded p-1 mb-0">
                       <div className="flex gap-1" style={{ height: '70px' }}>
-                        {/* Left grid: 3 cols \'d7 4 rows */}
                         <div className="grid gap-0" style={{ 
                           gridTemplateColumns: 'repeat(3, 1fr)',
                           gridTemplateRows: 'repeat(4, 1fr)',
@@ -2723,11 +2350,7 @@ const handleSaveAndClose = () => {
                             <div key={`left-${i}`} className="bg-white border border-gray-300"></div>
                           ))}
                         </div>
-                        
-                        {/* Space (half width of a cell) */}
                         <div style={{ width: '0.5fr' }}></div>
-                        
-                        {/* Right grid: 2 cols \'d7 4 rows */}
                         <div className="grid gap-0" style={{ 
                           gridTemplateColumns: 'repeat(2, 1fr)',
                           gridTemplateRows: 'repeat(4, 1fr)',
@@ -2740,10 +2363,9 @@ const handleSaveAndClose = () => {
                       </div>
                     </div>
                     
-                    {/* Middle to Bottom: Game Info */}
                     <div className="flex-1 flex flex-col items-center justify-end text-center" style={{ paddingBottom: '4px' }}>
                       <div style={{ fontSize: 'clamp(14px, 1.8vw, 20px)', color: myTeamSetup.colors.primary }} className="font-black leading-tight">
-                        {myTeamSetup.teamName} {myTeamSetup.mascot ? myTeamSetup.mascot : ''}
+                        {myTeamSetup.teamName}
                       </div>
                       <div style={{ fontSize: 'clamp(7px, 0.8vw, 9px)' }} className="text-gray-700">
                         ({myTeamData.record.w}-{myTeamData.record.l}-{myTeamData.record.t}, {myTeamData.section}, {myTeamData.conference})
@@ -2752,7 +2374,7 @@ const handleSaveAndClose = () => {
                       <div style={{ fontSize: 'clamp(10px, 1.3vw, 14px)', padding: '4px 0' }} className="font-semibold text-gray-600">VS</div>
                       
                       <div style={{ fontSize: 'clamp(14px, 1.8vw, 20px)', color: opponentColors.primary }} className="font-black leading-tight">
-                        {opponentData.teamName} {opponentData.nickname || opponentData.mascot || ''}
+                        {opponentData.teamName} {opponentData.nickname}
                       </div>
                       <div style={{ fontSize: 'clamp(7px, 0.8vw, 9px)' }} className="text-gray-700">
                         ({opponentData.record.w}-{opponentData.record.l}-{opponentData.record.t}, {opponentData.section}, {opponentData.conference})
@@ -2784,7 +2406,6 @@ const handleSaveAndClose = () => {
 
                   {/* C6 (12%) - OPPONENT LOGO/COACH/RECORD */}
                   <div className="flex flex-col items-center text-center gap-1">
-                    {/* Logo box - taller with gray background and two-color frame */}
                     <div className="flex items-center justify-center" style={{ 
                       width: '100%', 
                       height: '85px',
@@ -2798,7 +2419,6 @@ const handleSaveAndClose = () => {
                         <img src={opponentLogo} alt="Opponent" className="object-contain" style={{ maxHeight: '77px', width: '100%' }} />
                       )}
                     </div>
-                    {/* Coach info */}
                     <div className="flex flex-col">
                       <div style={{ fontSize: 'clamp(10px, 1.1vw, 13px)' }} className="font-bold">{opponentData.headCoach.name}</div>
                       <div style={{ fontSize: 'clamp(7px, 0.8vw, 9px)' }} className="text-gray-600">(Career: {totalOppCoachRecord.w}-{totalOppCoachRecord.l}-{totalOppCoachRecord.t})</div>
@@ -2849,8 +2469,7 @@ const handleSaveAndClose = () => {
                   </div>
                 </div>
 
-
-
+                {/* Available Players */}
                 <div className="no-print bg-gray-100 rounded p-2 mb-1">
                   <h2 className="text-sm font-bold mb-1">Available Players ({availablePlayers.length})</h2>
                   <div className="grid grid-cols-5 gap-2">
@@ -2860,10 +2479,10 @@ const handleSaveAndClose = () => {
                   </div>
                 </div>
 
+                {/* Forward Lines */}
                 <div className="mb-0">
                   <h2 style={{ fontSize: '13px' }} className="font-bold mb-0 text-center">FORWARD LINES</h2>
                   
-                  {/* Position Headers - Show once at top */}
                   <div className="flex items-center gap-2 mb-1">
                     <div className="no-print text-xs" style={{ width: '60px' }}></div>
                     <div className="flex-1 grid grid-cols-3 gap-1">
@@ -2893,41 +2512,35 @@ const handleSaveAndClose = () => {
                   ))}
                 </div>
 
-
-                {/* DEFENSE PAIRS + GOALIES + PK/PP - All horizontally aligned in rows */}
+                {/* Defense Pairs + Goalies + PK/PP */}
                 <div className="mb-1">
                   <div className="grid grid-cols-3 gap-2 mb-1">
                     <h2 style={{ fontSize: '13px' }} className="font-bold col-span-2 text-center">DEFENSE PAIRS</h2>
                     <h2 style={{ fontSize: '13px' }} className="font-bold text-center">GOALIES</h2>
                   </div>
                   
-                  {/* Position Headers - LD/RD and no label for goalies */}
                   <div className="grid grid-cols-3 gap-1 mb-1">
                     <div className="text-xs font-bold text-center" style={{ fontSize: '11px' }}>LD</div>
                     <div className="text-xs font-bold text-center" style={{ fontSize: '11px' }}>RD</div>
                     <div></div>
                   </div>
 
-                  {/* ROW 1: Defense Pair 1 (2 cols) + Goalie Starter (1 col) */}
                   <div className="grid grid-cols-3 gap-1 mb-1">
                     <LineSlot line="d1" position="ld" label="LD" showLabel={false} />
                     <LineSlot line="d1" position="rd" label="RD" showLabel={false} />
                     <LineSlot line="goalies" position="starter" label="Starter" showLabel={false} />
                   </div>
 
-                  {/* ROW 2: Defense Pair 2 (2 cols) + Goalie Backup (1 col) */}
                   <div className="grid grid-cols-3 gap-1 mb-1">
                     <LineSlot line="d2" position="ld" label="LD" showLabel={false} />
                     <LineSlot line="d2" position="rd" label="RD" showLabel={false} />
                     <LineSlot line="goalies" position="backup" label="Backup" showLabel={false} />
                   </div>
 
-                  {/* ROW 3: Defense Pair 3 (2 cols) + PK/PP Boxes (1 col split in 2) */}
                   <div className="grid grid-cols-3 gap-1 mb-1">
                     <LineSlot line="d3" position="ld" label="LD" showLabel={false} />
                     <LineSlot line="d3" position="rd" label="RD" showLabel={false} />
                     <div className="grid grid-cols-2 gap-2" style={{ height: '85px' }}>
-                      {/* Tigers PK */}
                       <div className="border-2 rounded flex flex-col" style={{ 
                         borderColor: myTeamSetup.colors.primary, 
                         background: `${myTeamSetup.colors.primary}10`,
@@ -2935,70 +2548,24 @@ const handleSaveAndClose = () => {
                       }}>
                         <div style={{ fontSize: '9px' }} className="font-bold text-center mb-0">{myTeamData.nickname} Penalty Kill</div>
                         <div className="flex-1 flex flex-col justify-around" style={{ fontSize: '9px', lineHeight: '1.1' }}>
-                          <input 
-                            type="text" 
-                            placeholder="" 
-                            className="w-full border-0 bg-transparent"
-                            style={{ fontSize: '9px', padding: '1px', outline: 'none' }}
-                            value={coachNotes.pk?.split('\\n')[0] || ''}
-                            onChange={(e) => {
-                              const lines = coachNotes.pk?.split('\\n') || ['','','','',''];
-                              lines[0] = e.target.value;
-                              setCoachNotes({...coachNotes, pk: lines.join('\\n')});
-                            }}
-                          />
-                          <input 
-                            type="text" 
-                            placeholder="" 
-                            className="w-full border-0 bg-transparent"
-                            style={{ fontSize: '9px', padding: '1px', outline: 'none' }}
-                            value={coachNotes.pk?.split('\\n')[1] || ''}
-                            onChange={(e) => {
-                              const lines = coachNotes.pk?.split('\\n') || ['','','','',''];
-                              lines[1] = e.target.value;
-                              setCoachNotes({...coachNotes, pk: lines.join('\\n')});
-                            }}
-                          />
-                          <input 
-                            type="text" 
-                            placeholder="" 
-                            className="w-full border-0 bg-transparent"
-                            style={{ fontSize: '9px', padding: '1px', outline: 'none' }}
-                            value={coachNotes.pk?.split('\\n')[2] || ''}
-                            onChange={(e) => {
-                              const lines = coachNotes.pk?.split('\\n') || ['','','','',''];
-                              lines[2] = e.target.value;
-                              setCoachNotes({...coachNotes, pk: lines.join('\\n')});
-                            }}
-                          />
-                          <input 
-                            type="text" 
-                            placeholder="" 
-                            className="w-full border-0 bg-transparent"
-                            style={{ fontSize: '9px', padding: '1px', outline: 'none' }}
-                            value={coachNotes.pk?.split('\\n')[3] || ''}
-                            onChange={(e) => {
-                              const lines = coachNotes.pk?.split('\\n') || ['','','','',''];
-                              lines[3] = e.target.value;
-                              setCoachNotes({...coachNotes, pk: lines.join('\\n')});
-                            }}
-                          />
-                          <input 
-                            type="text" 
-                            placeholder="" 
-                            className="w-full border-0 bg-transparent"
-                            style={{ fontSize: '9px', padding: '1px', outline: 'none' }}
-                            value={coachNotes.pk?.split('\\n')[4] || ''}
-                            onChange={(e) => {
-                              const lines = coachNotes.pk?.split('\\n') || ['','','','',''];
-                              lines[4] = e.target.value;
-                              setCoachNotes({...coachNotes, pk: lines.join('\\n')});
-                            }}
-                          />
+                          {[0,1,2,3,4].map(i => (
+                            <input 
+                              key={i}
+                              type="text" 
+                              placeholder="" 
+                              className="w-full border-0 bg-transparent"
+                              style={{ fontSize: '9px', padding: '1px', outline: 'none' }}
+                              value={coachNotes.pk?.split('\n')[i] || ''}
+                              onChange={(e) => {
+                                const lines = coachNotes.pk?.split('\n') || ['','','','',''];
+                                lines[i] = e.target.value;
+                                setCoachNotes({...coachNotes, pk: lines.join('\n')});
+                              }}
+                            />
+                          ))}
                         </div>
                       </div>
                       
-                      {/* Tigers PP */}
                       <div className="border-2 rounded flex flex-col" style={{ 
                         borderColor: myTeamSetup.colors.primary, 
                         background: `${myTeamSetup.colors.primary}10`,
@@ -3006,73 +2573,28 @@ const handleSaveAndClose = () => {
                       }}>
                         <div style={{ fontSize: '9px' }} className="font-bold text-center mb-0">{myTeamData.nickname} Power Play</div>
                         <div className="flex-1 flex flex-col justify-around" style={{ fontSize: '9px', lineHeight: '1.1' }}>
-                          <input 
-                            type="text" 
-                            placeholder="" 
-                            className="w-full border-0 bg-transparent"
-                            style={{ fontSize: '9px', padding: '1px', outline: 'none' }}
-                            value={coachNotes.pp?.split('\\n')[0] || ''}
-                            onChange={(e) => {
-                              const lines = coachNotes.pp?.split('\\n') || ['','','','',''];
-                              lines[0] = e.target.value;
-                              setCoachNotes({...coachNotes, pp: lines.join('\\n')});
-                            }}
-                          />
-                          <input 
-                            type="text" 
-                            placeholder="" 
-                            className="w-full border-0 bg-transparent"
-                            style={{ fontSize: '9px', padding: '1px', outline: 'none' }}
-                            value={coachNotes.pp?.split('\\n')[1] || ''}
-                            onChange={(e) => {
-                              const lines = coachNotes.pp?.split('\\n') || ['','','','',''];
-                              lines[1] = e.target.value;
-                              setCoachNotes({...coachNotes, pp: lines.join('\\n')});
-                            }}
-                          />
-                          <input 
-                            type="text" 
-                            placeholder="" 
-                            className="w-full border-0 bg-transparent"
-                            style={{ fontSize: '9px', padding: '1px', outline: 'none' }}
-                            value={coachNotes.pp?.split('\\n')[2] || ''}
-                            onChange={(e) => {
-                              const lines = coachNotes.pp?.split('\\n') || ['','','','',''];
-                              lines[2] = e.target.value;
-                              setCoachNotes({...coachNotes, pp: lines.join('\\n')});
-                            }}
-                          />
-                          <input 
-                            type="text" 
-                            placeholder="" 
-                            className="w-full border-0 bg-transparent"
-                            style={{ fontSize: '9px', padding: '1px', outline: 'none' }}
-                            value={coachNotes.pp?.split('\\n')[3] || ''}
-                            onChange={(e) => {
-                              const lines = coachNotes.pp?.split('\\n') || ['','','','',''];
-                              lines[3] = e.target.value;
-                              setCoachNotes({...coachNotes, pp: lines.join('\\n')});
-                            }}
-                          />
-                          <input 
-                            type="text" 
-                            placeholder="" 
-                            className="w-full border-0 bg-transparent"
-                            style={{ fontSize: '9px', padding: '1px', outline: 'none' }}
-                            value={coachNotes.pp?.split('\\n')[4] || ''}
-                            onChange={(e) => {
-                              const lines = coachNotes.pp?.split('\\n') || ['','','','',''];
-                              lines[4] = e.target.value;
-                              setCoachNotes({...coachNotes, pp: lines.join('\\n')});
-                            }}
-                          />
+                          {[0,1,2,3,4].map(i => (
+                            <input 
+                              key={i}
+                              type="text" 
+                              placeholder="" 
+                              className="w-full border-0 bg-transparent"
+                              style={{ fontSize: '9px', padding: '1px', outline: 'none' }}
+                              value={coachNotes.pp?.split('\n')[i] || ''}
+                              onChange={(e) => {
+                                const lines = coachNotes.pp?.split('\n') || ['','','','',''];
+                                lines[i] = e.target.value;
+                                setCoachNotes({...coachNotes, pp: lines.join('\n')});
+                              }}
+                            />
+                          ))}
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* MANAGER AND INJURED BOXES - One line tall, half page width each */}
+                {/* Manager and Injured Boxes */}
                 <div className="grid grid-cols-2 gap-2 mb-1 mt-3">
                   <div className="rounded px-2 py-1 flex items-center" style={{ 
                     backgroundColor: `${myTeamSetup.colors.primary}15`,
@@ -3102,8 +2624,9 @@ const handleSaveAndClose = () => {
                 </div>
               </div>
 
+              {/* Print Page 2 */}
               <div className="print-page-2 bg-white p-4 max-w-7xl mx-auto page-break" style={{ maxWidth: '7.875in' }}>
-                {/* COMPRESSED OPPONENT HEADER */}
+                {/* Opponent Header */}
                 <div className="rounded-lg p-2 mb-2" style={{ border: `3px solid ${opponentColors.primary}` }}>
                   <h2 className="text-xl font-black text-center mb-0" style={{ color: opponentColors.primary }}>
                     Opponent: {opponentData.teamName} {opponentData.nickname}
@@ -3113,12 +2636,11 @@ const handleSaveAndClose = () => {
                   </div>
                 </div>
 
-                {/* TWO-COLUMN ROSTER LAYOUT */}
+                {/* Opponent Roster */}
                 <div className="mb-2">
                   <h2 className="text-lg font-bold mb-1" style={{ color: opponentColors.primary }}>Opponent Roster</h2>
                   
                   {(() => {
-                    // Calculate auto-scaling font size based on roster size (increased 40%)
                     const totalPlayers = opponentData.roster.length;
                     const fontSize = totalPlayers >= 35 ? '10px' : 
                                     totalPlayers >= 25 ? '11px' : 
@@ -3129,7 +2651,6 @@ const handleSaveAndClose = () => {
                     const defense = opponentData.roster.filter(p => p.position === 'D').sort((a, b) => parseInt(a.number) - parseInt(b.number));
                     const goalies = opponentData.roster.filter(p => p.position === 'G').sort((a, b) => parseInt(a.number) - parseInt(b.number));
                     
-                    // Calculate max values for stat highlighting (forwards)
                     const fwdMaxStats = {
                       g: Math.max(...forwards.map(p => p.stats.g), 0),
                       a: Math.max(...forwards.map(p => p.stats.a), 0),
@@ -3141,7 +2662,6 @@ const handleSaveAndClose = () => {
                       pim: Math.max(...forwards.map(p => p.stats.pim), 0)
                     };
                     
-                    // Calculate max values for stat highlighting (defense)
                     const defMaxStats = {
                       g: Math.max(...defense.map(p => p.stats.g), 0),
                       a: Math.max(...defense.map(p => p.stats.a), 0),
@@ -3153,12 +2673,11 @@ const handleSaveAndClose = () => {
                       pim: Math.max(...defense.map(p => p.stats.pim), 0)
                     };
                     
-                    // Helper function to check if cell should be highlighted
                     const isMaxStat = (value, maxValue) => value > 0 && value === maxValue;
                     
                     return (
                       <div className="grid grid-cols-2 gap-2" style={{ fontSize }}>
-                        {/* LEFT COLUMN: FORWARDS */}
+                        {/* FORWARDS */}
                         <div>
                           <h3 className="font-bold mb-1 px-2 py-1 rounded text-xs" style={{ background: `${opponentColors.primary}20`, color: opponentColors.secondary }}>
                             Forwards
@@ -3201,9 +2720,8 @@ const handleSaveAndClose = () => {
                           </table>
                         </div>
 
-                        {/* RIGHT COLUMN: DEFENSE + GOALIES */}
+                        {/* DEFENSE + GOALIES */}
                         <div>
-                          {/* DEFENSE */}
                           <h3 className="font-bold mb-1 px-2 py-1 rounded text-xs" style={{ background: `${opponentColors.primary}20`, color: opponentColors.secondary }}>
                             Defense
                           </h3>
@@ -3244,7 +2762,6 @@ const handleSaveAndClose = () => {
                             </tbody>
                           </table>
 
-                          {/* GOALIES */}
                           <h3 className="font-bold mb-1 px-2 py-1 rounded text-xs" style={{ background: `${opponentColors.primary}20`, color: opponentColors.secondary }}>
                             Goalies
                           </h3>
@@ -3292,11 +2809,10 @@ const handleSaveAndClose = () => {
                   })()}
                 </div>
 
-                {/* DIAGRAMS & PREPARATION NOTES - Bottom 1/3 of page */}
+                {/* Diagrams & Notes */}
                 <div className="mt-2" style={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
                   <h2 style={{ fontSize: '14px', color: 'black' }} className="font-bold mb-2">Pre-Game Preparation - Diagrams & Notes</h2>
                   
-                  {/* Row 1: 3 diagrams */}
                   <div className="grid grid-cols-3 gap-2 mb-2">
                     {['image1', 'image2', 'image3'].map((key, idx) => (
                       <div key={key} className="border-2 border-dashed border-gray-400 rounded p-2 bg-gray-50" style={{ minHeight: '180px', position: 'relative', display: 'flex', flexDirection: 'column' }}>
@@ -3307,7 +2823,7 @@ const handleSaveAndClose = () => {
                               onClick={() => setDiagramImages({...diagramImages, [key]: null})}
                               className="no-print absolute top-0 right-0 bg-red-500 text-white text-xs px-2 py-1 rounded hover:bg-red-600"
                             >
-                              \'d7
+                              ×
                             </button>
                           </div>
                         ) : (
@@ -3357,7 +2873,6 @@ const handleSaveAndClose = () => {
                     ))}
                   </div>
                   
-                  {/* Row 2: 2 diagrams - expands to fill remaining space */}
                   <div className="grid grid-cols-2 gap-2" style={{ flexGrow: 1, minHeight: '180px' }}>
                     {['image4', 'image5'].map((key, idx) => (
                       <div key={key} className="border-2 border-dashed border-gray-400 rounded p-2 bg-gray-50" style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
@@ -3368,7 +2883,7 @@ const handleSaveAndClose = () => {
                               onClick={() => setDiagramImages({...diagramImages, [key]: null})}
                               className="no-print absolute top-0 right-0 bg-red-500 text-white text-xs px-2 py-1 rounded hover:bg-red-600"
                             >
-                              \'d7
+                              ×
                             </button>
                           </div>
                         ) : (
@@ -3420,6 +2935,7 @@ const handleSaveAndClose = () => {
                 </div>
               </div>
 
+              {/* Print Styles */}
               <style>{`
                 @media print {
                   .no-print {
@@ -3433,17 +2949,16 @@ const handleSaveAndClose = () => {
                   
                   .print-page-1, .print-page-2 {
                     page-break-after: always;
-                    margin: 0 auto !important; /* Force horizontal centering */
+                    margin: 0 auto !important;
                     padding: 0.05in;
-                    max-width: 7.875in !important; /* Enforce max width */
+                    max-width: 7.875in !important;
                     width: 7.875in !important;
-                    min-height: 10.375in; /* 11in - (2 \'d7 0.3125in margins) */
+                    min-height: 10.375in;
                     box-sizing: border-box !important;
                     overflow: hidden;
                     position: relative;
                     left: 0;
                     right: 0;
-                    /* REMOVED vertical centering to prevent overflow */
                   }
                   
                   .print-page-2 {
@@ -3452,15 +2967,13 @@ const handleSaveAndClose = () => {
                   
                   @page {
                     size: 8.5in 11in;
-                    margin: 0.3125in; /* Equal margins all around: (8.5 - 7.875) / 2 = 0.3125in */
+                    margin: 0.3125in;
                   }
                   
-                  /* Ensure all grid elements use border-box */
                   * {
                     box-sizing: border-box !important;
                   }
                   
-                  /* Ensure diagrams don't overflow */
                   .print-page-2 > div:last-child {
                     flex-shrink: 1;
                     overflow: hidden;
@@ -3475,7 +2988,13 @@ const handleSaveAndClose = () => {
           );
         };
 
-        ReactDOM.render(<HockeyLinesChart />, document.getElementById('root'));
+        // Render with Error Boundary
+        ReactDOM.render(
+          <ErrorBoundary>
+            <HockeyLinesChart />
+          </ErrorBoundary>,
+          document.getElementById('root')
+        );
     </script>
 </body>
 </html>
