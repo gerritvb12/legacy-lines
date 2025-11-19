@@ -651,57 +651,116 @@
                 }
               }
               
-              // Parse Next Game
+              // Parse Next Game - Find SECOND scheduled game (skip the current game which is game #1)
               let nextGame = null;
-              const nextGameIdx = lines.findIndex(l => l === 'Next Game');
-              if (nextGameIdx >= 0) {
-                let opponent = '';
-                let isHome = false;
-                let date = '';
-                let time = '';
-                
-                for (let i = nextGameIdx + 1; i < Math.min(lines.length, nextGameIdx + 10); i++) {
-                  if (lines[i] === 'AT') {
-                    isHome = false;
-                    for (let j = i + 1; j < Math.min(lines.length, i + 5); j++) {
-                      if (lines[j] && lines[j].length > 2 && lines[j] !== teamName && !lines[j].includes('@')) {
-                        opponent = lines[j];
-                        break;
+              
+              // Find all scheduled games
+              const scheduledGames = [];
+              for (let i = 0; i < lines.length; i++) {
+                if (lines[i] === 'Scheduled' || lines[i].includes('@ ') && lines[i].match(/\d{1,2}:\d{2}/)) {
+                  // Look backwards to find opponent and date
+                  let opponent = '';
+                  let date = '';
+                  let time = '';
+                  let isHome = false;
+                  
+                  // Check previous lines for opponent and date/time
+                  for (let j = Math.max(0, i - 5); j < i; j++) {
+                    const line = lines[j];
+                    
+                    // Date/time line format: "Sat Nov 22 @ 2:00pm"
+                    if (line.includes('@') && line.match(/\d{1,2}:\d{2}/)) {
+                      const parts = line.split('@');
+                      date = parts[0]?.trim() || '';
+                      time = parts[1]?.trim() || '';
+                    }
+                    
+                    // Opponent line - look for team names (not "Delano-" or current team)
+                    if (line && line.length > 2 && !line.includes(teamName) && !line.includes('@') && 
+                        !line.match(/^\d/) && line !== 'Scheduled' && !line.includes(':')) {
+                      if (line.endsWith('-')) {
+                        opponent = line.slice(0, -1).trim();
+                        // Determine home/away
+                        const delanoline = lines[j-1];
+                        if (delanoline && delanoline.includes(teamName + '-')) {
+                          isHome = true;  // Delano listed first = home game
+                        }
                       }
                     }
-                    break;
-                  } else if (lines[i] === 'VS') {
-                    isHome = true;
-                    for (let j = i + 1; j < Math.min(lines.length, i + 5); j++) {
-                      if (lines[j] && lines[j].length > 2 && lines[j] !== teamName && !lines[j].includes('@')) {
-                        opponent = lines[j];
-                        break;
-                      }
-                    }
-                    break;
+                  }
+                  
+                  if (opponent && date) {
+                    scheduledGames.push({ opponent, isHome, date, time });
                   }
                 }
-                
-                for (let i = nextGameIdx + 1; i < Math.min(lines.length, nextGameIdx + 15); i++) {
-                  if (lines[i].includes('@') && (lines[i].includes(':') || lines[i].includes('p') || lines[i].includes('a'))) {
-                    const parts = lines[i].split('@');
-                    date = parts[0]?.trim() || '';
-                    time = parts[1]?.trim() || '';
-                    break;
-                  }
-                }
-                
-                nextGame = {
-                  opponent,
-                  isHome,
-                  date,
-                  time,
-                  gameNum: ''
-                };
               }
               
-              if (nextGame) {
-                nextGame.gameNum = (record.w + record.l + record.t + 1).toString();
+              console.log('📅 Found', scheduledGames.length, 'scheduled games');
+              
+              // Use the SECOND game as next game (first is current game)
+              if (scheduledGames.length >= 2) {
+                nextGame = {
+                  ...scheduledGames[1],
+                  gameNum: (record.w + record.l + record.t + 2).toString()  // Game 2
+                };
+                console.log('✓ Next game (Game 2):', nextGame);
+              } else if (scheduledGames.length === 1) {
+                // Only one game scheduled (current game)
+                nextGame = {
+                  opponent: 'TBD',
+                  isHome: false,
+                  date: '',
+                  time: '',
+                  gameNum: (record.w + record.l + record.t + 2).toString()
+                };
+              } else {
+                // Fallback to old parsing method
+                const nextGameIdx = lines.findIndex(l => l === 'Next Game');
+                if (nextGameIdx >= 0) {
+                  let opponent = '';
+                  let isHome = false;
+                  let date = '';
+                  let time = '';
+                  
+                  for (let i = nextGameIdx + 1; i < Math.min(lines.length, nextGameIdx + 10); i++) {
+                    if (lines[i] === 'AT') {
+                      isHome = false;
+                      for (let j = i + 1; j < Math.min(lines.length, i + 5); j++) {
+                        if (lines[j] && lines[j].length > 2 && lines[j] !== teamName && !lines[j].includes('@')) {
+                          opponent = lines[j];
+                          break;
+                        }
+                      }
+                      break;
+                    } else if (lines[i] === 'VS') {
+                      isHome = true;
+                      for (let j = i + 1; j < Math.min(lines.length, i + 5); j++) {
+                        if (lines[j] && lines[j].length > 2 && lines[j] !== teamName && !lines[j].includes('@')) {
+                          opponent = lines[j];
+                          break;
+                        }
+                      }
+                      break;
+                    }
+                  }
+                  
+                  for (let i = nextGameIdx + 1; i < Math.min(lines.length, nextGameIdx + 15); i++) {
+                    if (lines[i].includes('@') && (lines[i].includes(':') || lines[i].includes('p') || lines[i].includes('a'))) {
+                      const parts = lines[i].split('@');
+                      date = parts[0]?.trim() || '';
+                      time = parts[1]?.trim() || '';
+                      break;
+                    }
+                  }
+                  
+                  nextGame = {
+                    opponent,
+                    isHome,
+                    date,
+                    time,
+                    gameNum: (record.w + record.l + record.t + 1).toString()
+                  };
+                }
               }
               
               console.log('📋 ========== PARSE COMPLETE ==========');
@@ -726,16 +785,19 @@
               
               for (let i = 0; i < lines.length; i++) {
                 const line = lines[i];
+                
+                // Try tab-separated first
                 const fields = line.split('\t').map(f => f.trim()).filter(f => f);
                 
                 if (fields.length >= 4) {
+                  // Tab-separated format
                   const number = fields[0];
                   const name = fields[1];
                   const position = fields[2];
                   const grade = fields[3];
                   
                   if (/^\d+$/.test(number) && /^[FDG]$/.test(position) && /^\d{1,2}$/.test(grade)) {
-                    console.log('✓ Found player:', { number, name, position, grade });
+                    console.log('✓ Found player (tab-separated):', { number, name, position, grade });
                     
                     const nameParts = name.split(' ');
                     const lastName = nameParts[nameParts.length - 1];
@@ -758,6 +820,68 @@
                     let dobYear = '';
                     const lastField = fields[fields.length - 1];
                     const yearMatch = lastField.match(/\b(19|20)\d{2}\b/);
+                    if (yearMatch) {
+                      dobYear = yearMatch[0];
+                    }
+                    
+                    const existingPlayer = existingRoster.find(p => 
+                      p.lastName?.toUpperCase() === lastName.toUpperCase() && 
+                      p.firstName?.charAt(0)?.toUpperCase() === firstName.charAt(0)?.toUpperCase()
+                    );
+                    
+                    roster.push({
+                      id: `${number}-${lastName}`,
+                      number: number,
+                      name: name,
+                      firstName: firstName,
+                      lastName: lastName,
+                      position: position,
+                      grade: grade,
+                      dobYear: dobYear,
+                      handed: handed,
+                      shoots: shoots,
+                      stats: { gp: 0, g: 0, a: 0, pts: 0, ppg: 0, ppa: 0, sh: 0, sha: 0, pim: 0, plusMinus: 0, fow: 0, fol: 0 },
+                      goalieStats: position === 'G' ? { gp: 0, min: '0:00', w: 0, l: 0, t: 0, sog: 0, ga: 0, sv: 0, gaa: 0, svp: '.000', so: 0 } : null,
+                      baseCareerStats: existingPlayer?.baseCareerStats || undefined,
+                      baseCareerGoalieStats: existingPlayer?.baseCareerGoalieStats || undefined,
+                      pronunciation: existingPlayer?.pronunciation || undefined
+                    });
+                  }
+                } else {
+                  // Try concatenated format: "1Evan GeyenG126' 3\"190LC2007"
+                  // Pattern: NUMBER + NAME + POSITION(F/D/G) + GRADE + rest
+                  const concatMatch = line.match(/^(\d+)([A-Za-z\s\-'\.]+)\s*([FDG])(\d{1,2})/);
+                  
+                  if (concatMatch) {
+                    const number = concatMatch[1];
+                    const name = concatMatch[2].trim();
+                    const position = concatMatch[3];
+                    const grade = concatMatch[4];
+                    
+                    console.log('✓ Found player (concatenated):', { number, name, position, grade });
+                    
+                    const nameParts = name.split(' ');
+                    const lastName = nameParts[nameParts.length - 1];
+                    const firstName = nameParts.slice(0, -1).join(' ');
+                    
+                    // Extract shoots/handed (L, LC, R, RC)
+                    let handed = '';
+                    let shoots = '';
+                    const shootsMatch = line.match(/(Left|Right|LC|RC)/);
+                    if (shootsMatch) {
+                      const shootsStr = shootsMatch[1];
+                      if (shootsStr.includes('L')) {
+                        handed = 'L';
+                        shoots = 'L';
+                      } else if (shootsStr.includes('R')) {
+                        handed = 'R';
+                        shoots = 'R';
+                      }
+                    }
+                    
+                    // Extract DOB year
+                    let dobYear = '';
+                    const yearMatch = line.match(/\b(19|20)\d{2}\b/);
                     if (yearMatch) {
                       dobYear = yearMatch[0];
                     }
