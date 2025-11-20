@@ -483,10 +483,28 @@
               
               // Find team name
               const subscribeIdx = lines.findIndex(l => l === 'Subscribe');
-              const historyIdx = lines.findIndex(l => l === 'History');
-              if (subscribeIdx >= 0 && historyIdx > subscribeIdx && historyIdx - subscribeIdx <= 3) {
-                teamName = lines[subscribeIdx + 1];
-                console.log('✅ Found team name:', teamName);
+              if (subscribeIdx >= 0 && subscribeIdx + 1 < lines.length) {
+                const potentialName = lines[subscribeIdx + 1];
+                // Team name should be a substantial word, not a menu item
+                if (potentialName && potentialName.length > 2 && 
+                    !potentialName.includes('Home') && 
+                    !potentialName.includes('Roster') &&
+                    !potentialName.includes('Game')) {
+                  teamName = potentialName;
+                  console.log('✅ Found team name:', teamName);
+                }
+              }
+              
+              // If still no team name, look for it before "Home" menu item
+              if (!teamName) {
+                const homeIdx = lines.findIndex(l => l === 'Home');
+                if (homeIdx > 0) {
+                  const potentialName = lines[homeIdx - 1];
+                  if (potentialName && potentialName.length > 2 && potentialName !== 'Delano') {
+                    teamName = potentialName;
+                    console.log('✅ Found team name (before Home):', teamName);
+                  }
+                }
               }
               
               // Find nickname
@@ -565,6 +583,18 @@
                 const coachesPart = assistantLine.split('Assistant Coaches:')[1]?.trim();
                 if (coachesPart) {
                   assistantCoaches = coachesPart.split(',').map(name => name.trim()).filter(name => name);
+                }
+              }
+              
+              // Parse Student Managers
+              let studentManager = '';
+              const managerIdx = lines.findIndex(l => l.includes('Student Managers:') || l.includes('Student Manager:'));
+              if (managerIdx >= 0) {
+                const managerLine = lines[managerIdx];
+                const managersPart = managerLine.split(/Student Managers?:/)[1]?.trim();
+                if (managersPart) {
+                  studentManager = managersPart;
+                  console.log('✅ Found student managers:', studentManager);
                 }
               }
               
@@ -765,7 +795,7 @@
               
               console.log('📋 ========== PARSE COMPLETE ==========');
               
-              return { teamName, nickname, record, section, conference, headCoach, assistantCoaches, stats, lastGame, nextGame };
+              return { teamName, nickname, record, section, conference, headCoach, assistantCoaches, studentManager, stats, lastGame, nextGame };
             } catch (error) {
               console.error('Error parsing home page:', error);
               return { 
@@ -849,8 +879,11 @@
                   }
                 } else {
                   // Try concatenated format: "1Evan GeyenG126' 3\"190LC2007"
-                  // Pattern: NUMBER + NAME + POSITION(F/D/G) + GRADE + rest
-                  const concatMatch = line.match(/^(\d+)([A-Za-z\s\-'\.]+)\s*([FDG])(\d{1,2})/);
+                  // Pattern: NUMBER + NAME + POSITION + GRADE + HEIGHT + WEIGHT + SHOOTS + YEAR
+                  // Example: 1Evan GeyenG126' 3"190LC2007
+                  //          ^number ^name  ^pos^grade ^height^weight^shoots^year
+                  
+                  const concatMatch = line.match(/^(\d+)([A-Za-z\s\-'\.]+?)([FDG])(\d{1,2})/);
                   
                   if (concatMatch) {
                     const number = concatMatch[1];
@@ -858,22 +891,32 @@
                     const position = concatMatch[3];
                     const grade = concatMatch[4];
                     
-                    console.log('✓ Found player (concatenated):', { number, name, position, grade });
+                    // Extract the part AFTER grade number
+                    const afterGrade = line.substring(line.indexOf(grade) + grade.length);
                     
-                    const nameParts = name.split(' ');
-                    const lastName = nameParts[nameParts.length - 1];
-                    const firstName = nameParts.slice(0, -1).join(' ');
-                    
-                    // Extract shoots/handed (L, LC, R, RC)
+                    // Extract shoots/handed from the position AFTER weight (3 digits)
+                    // Pattern: HEIGHT(like 6' 3") + WEIGHT(like 190) + SHOOTS(LC/RC/Left/Right)
+                    // Look for LC, RC, Left, or Right BEFORE the year
                     let handed = '';
                     let shoots = '';
-                    const shootsMatch = line.match(/(Left|Right|LC|RC)/);
-                    if (shootsMatch) {
-                      const shootsStr = shootsMatch[1];
-                      if (shootsStr.includes('L')) {
+                    
+                    // Find year first
+                    const yearMatch = afterGrade.match(/\b(19|20)\d{2}\b/);
+                    if (yearMatch) {
+                      // Get everything between grade and year
+                      const beforeYear = afterGrade.substring(0, yearMatch.index);
+                      
+                      // Now look for shoots in this section
+                      if (beforeYear.includes('LC')) {
                         handed = 'L';
                         shoots = 'L';
-                      } else if (shootsStr.includes('R')) {
+                      } else if (beforeYear.includes('RC')) {
+                        handed = 'R';
+                        shoots = 'R';
+                      } else if (beforeYear.match(/Left(?![\w])/)) {
+                        handed = 'L';
+                        shoots = 'L';
+                      } else if (beforeYear.match(/Right(?![\w])/)) {
                         handed = 'R';
                         shoots = 'R';
                       }
@@ -881,10 +924,15 @@
                     
                     // Extract DOB year
                     let dobYear = '';
-                    const yearMatch = line.match(/\b(19|20)\d{2}\b/);
                     if (yearMatch) {
                       dobYear = yearMatch[0];
                     }
+                    
+                    console.log('✓ Found player (concatenated):', { number, name, position, grade, shoots, dobYear });
+                    
+                    const nameParts = name.split(' ');
+                    const lastName = nameParts[nameParts.length - 1];
+                    const firstName = nameParts.slice(0, -1).join(' ');
                     
                     const existingPlayer = existingRoster.find(p => 
                       p.lastName?.toUpperCase() === lastName.toUpperCase() && 
