@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MSHSL Legacy Lines v6.27</title>
+    <title>MSHSL Legacy Lines v6.28</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -758,13 +758,19 @@
               
               console.log('📅 Found', scheduledGames.length, 'scheduled games');
               
-              // Use the SECOND game as next game (first is current game)
-              if (scheduledGames.length >= 2) {
+              // Use the THIRD game to skip duplicate (Game 3)
+              if (scheduledGames.length >= 3) {
+                nextGame = {
+                  ...scheduledGames[2],
+                  gameNum: (record.w + record.l + record.t + 2).toString()  // Game 3 = actual next
+                };
+                console.log('✓ Next game (Game 3):', nextGame);
+              } else if (scheduledGames.length >= 2) {
                 nextGame = {
                   ...scheduledGames[1],
-                  gameNum: (record.w + record.l + record.t + 2).toString()  // FIX 4: Game 2
+                  gameNum: (record.w + record.l + record.t + 2).toString()
                 };
-                console.log('✓ Next game (Game 2):', nextGame);
+                console.log('✓ Next game (Game 2 fallback):', nextGame);
               } else if (scheduledGames.length === 1) {
                 // Only one game scheduled (current game)
                 nextGame = {
@@ -2439,7 +2445,7 @@
                     {myTeamSetup.logo && (
                       <img src={myTeamSetup.logo} alt="Team" className="h-10 w-10 object-contain bg-white rounded p-1" />
                     )}
-                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v6.27</h1>
+                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v6.28</h1>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setShowSetup(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
