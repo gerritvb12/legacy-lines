@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MSHSL Legacy Lines v6.22</title>
+    <title>MSHSL Legacy Lines v6.23</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -2439,7 +2439,7 @@
                     {myTeamSetup.logo && (
                       <img src={myTeamSetup.logo} alt="Team" className="h-10 w-10 object-contain bg-white rounded p-1" />
                     )}
-                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v6.22</h1>
+                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v6.23</h1>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setShowSetup(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
@@ -2655,24 +2655,6 @@
 
                   {/* C7 (18%) - OPPONENT LAST/NEXT GAMES */}
                   <div className="flex flex-col justify-between text-center" style={{ padding: '4px', overflow: 'hidden' }}>
-                    <div className="flex-1 flex flex-col justify-center">
-                      <div style={{ fontSize: 'clamp(9px, 1vw, 12px)' }} className="font-bold text-gray-600">LAST GAME</div>
-                      {opponentData.lastGame ? (
-                        <>
-                          <div style={{ fontSize: 'clamp(10px, 1.1vw, 13px)', wordWrap: 'break-word' }} className="leading-tight">
-                            {opponentData.teamName} <span className={`font-black ${
-                              opponentData.lastGame.result === 'W' ? 'text-green-600' :
-                              opponentData.lastGame.result === 'L' ? 'text-red-600' :
-                              'text-gray-600'
-                            }`}>{opponentData.lastGame.ourScore} - {opponentData.lastGame.oppScore}</span> <span className="font-bold">{opponentData.lastGame.opponent}</span>
-                          </div>
-                          <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)', wordWrap: 'break-word' }} className="text-gray-500">{opponentData.lastGame.date}</div>
-                        </>
-                      ) : (
-                        <div style={{ fontSize: 'clamp(10px, 1.1vw, 13px)' }} className="text-gray-400">N/A</div>
-                      )}
-                    </div>
-                    
                     <div className="flex-1 flex flex-col justify-center">
                       <div style={{ fontSize: 'clamp(9px, 1vw, 12px)' }} className="font-bold text-gray-600">LAST GAME</div>
                       {opponentData.lastGame ? (
