@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MSHSL Legacy Lines v6.18</title>
+    <title>MSHSL Legacy Lines v6.19</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -859,7 +859,9 @@
                   if (/^\d+$/.test(number) && /^[FDG]$/.test(position) && /^\d{1,2}$/.test(grade)) {
                     console.log('✓ Found player (tab-separated):', { number, name, position, grade });
                     
-                    const nameParts = name.split(' ');
+                    // Strip (Capt.) or (Capt) from names
+                    const cleanName = name.replace(/\s*\(Capt\.?\)/i, '').trim();
+                    const nameParts = cleanName.split(' ');
                     const lastName = nameParts[nameParts.length - 1];
                     const firstName = nameParts.slice(0, -1).join(' ');
                     
@@ -975,7 +977,9 @@
                     
                     console.log('✓ Found player (concatenated):', { number, name, position, grade, shoots, dobYear });
                     
-                    const nameParts = name.split(' ');
+                    // Strip (Capt.) or (Capt) from names
+                    const cleanName = name.replace(/\s*\(Capt\.?\)/i, '').trim();
+                    const nameParts = cleanName.split(' ');
                     const lastName = nameParts[nameParts.length - 1];
                     const firstName = nameParts.slice(0, -1).join(' ');
                     
@@ -2432,7 +2436,7 @@
                     {myTeamSetup.logo && (
                       <img src={myTeamSetup.logo} alt="Team" className="h-10 w-10 object-contain bg-white rounded p-1" />
                     )}
-                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v6.18</h1>
+                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v6.19</h1>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setShowSetup(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
@@ -2595,7 +2599,7 @@
                         ({opponentData.record.w}-{opponentData.record.l}-{opponentData.record.t}, {opponentData.section}, {opponentData.conference})
                       </div>
                       
-                      <div style={{ fontSize: 'clamp(11px, 1.4vw, 15px)', fontWeight: '800', marginTop: '4px' }} className="text-gray-600">Game #{myTeamData.nextGame?.gameNum || (myTeamData.record.w + myTeamData.record.l + myTeamData.record.t + 1)}</div>
+                      <div style={{ fontSize: 'clamp(11px, 1.4vw, 15px)', fontWeight: '800', marginTop: '4px' }} className="text-gray-600">Game #{(myTeamData.record.w + myTeamData.record.l + myTeamData.record.t + 1)}</div>
                     </div>
                   </div>
 
@@ -2667,19 +2671,13 @@
                     </div>
                     
                     <div className="flex-1 flex flex-col justify-center">
-                      <div style={{ fontSize: 'clamp(9px, 1vw, 12px)' }} className="font-bold text-gray-600">NEXT GAME</div>
-                      {opponentData.nextGame && opponentData.nextGame.opponent && opponentData.nextGame.opponent !== 'TBD' ? (
-                        <>
-                          <div style={{ fontSize: 'clamp(10px, 1.1vw, 13px)', wordWrap: 'break-word' }} className="font-bold leading-tight">
-                            {opponentData.nextGame.isHome ? 'VS' : 'AT'} {opponentData.nextGame.opponent}
-                          </div>
-                          <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)', wordWrap: 'break-word' }} className="text-gray-500">
-                            {opponentData.nextGame.date} @ {opponentData.nextGame.time}
-                          </div>
-                        </>
-                      ) : (
-                        <div style={{ fontSize: 'clamp(10px, 1.1vw, 13px)' }} className="text-gray-400">TBD</div>
-                      )}
+                      <div style={{ fontSize: 'clamp(9px, 1vw, 12px)' }} className="font-bold text-gray-600">SEASON RECORD</div>
+                      <div style={{ fontSize: 'clamp(14px, 1.6vw, 18px)' }} className="font-black">
+                        {opponentData.record.w}-{opponentData.record.l}-{opponentData.record.t}
+                      </div>
+                      <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)' }} className="text-gray-600">
+                        {opponentData.section} / {opponentData.conference}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -3025,7 +3023,7 @@
                 </div>
 
                 {/* Diagrams & Notes */}
-                <div className="mt-2" style={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+                <div className="mt-2" style={{ display: 'flex', flexDirection: 'column', maxHeight: 'calc(100% - 400px)', overflow: 'hidden' }}>
                   <h2 style={{ fontSize: '14px', color: 'black' }} className="font-bold mb-2">Pre-Game Preparation - Diagrams & Notes</h2>
                   
                   <div className="grid grid-cols-3 gap-2 mb-2">
