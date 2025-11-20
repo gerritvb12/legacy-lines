@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MSHSL Legacy Lines v6.21</title>
+    <title>MSHSL Legacy Lines v6.22</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -1611,6 +1611,7 @@
                     const seasonG = parseInt(fields[3]) || 0;
                     const seasonA = parseInt(fields[4]) || 0;
                     const seasonPts = parseInt(fields[5]) || 0;
+                    const seasonPIM = parseInt(fields[13]) || 0;
                     const seasonPlusMinus = parseInt(fields[19]) || 0;
                     const seasonFOW = parseInt(fields[14]) || 0;
                     const seasonFOL = parseInt(fields[15]) || 0;
@@ -1623,7 +1624,7 @@
                     if (!careerData[key]) {
                       careerData[key] = {
                         type: 'skater',
-                        data: { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0, fow: 0, fol: 0 }
+                        data: { gp: 0, g: 0, a: 0, pts: 0, pim: 0, plusMinus: 0, fow: 0, fol: 0 }
                       };
                     }
                     
@@ -1631,6 +1632,7 @@
                     careerData[key].data.g += seasonG;
                     careerData[key].data.a += seasonA;
                     careerData[key].data.pts += seasonPts;
+                    careerData[key].data.pim += seasonPIM;
                     careerData[key].data.plusMinus += seasonPlusMinus;
                     careerData[key].data.fow += seasonFOW;
                     careerData[key].data.fol += seasonFOL;
@@ -2437,7 +2439,7 @@
                     {myTeamSetup.logo && (
                       <img src={myTeamSetup.logo} alt="Team" className="h-10 w-10 object-contain bg-white rounded p-1" />
                     )}
-                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v6.21</h1>
+                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v6.22</h1>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setShowSetup(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
@@ -2672,13 +2674,37 @@
                     </div>
                     
                     <div className="flex-1 flex flex-col justify-center">
-                      <div style={{ fontSize: 'clamp(9px, 1vw, 12px)' }} className="font-bold text-gray-600">SEASON RECORD</div>
-                      <div style={{ fontSize: 'clamp(14px, 1.6vw, 18px)' }} className="font-black">
-                        {opponentData.record.w}-{opponentData.record.l}-{opponentData.record.t}
-                      </div>
-                      <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)' }} className="text-gray-600">
-                        {opponentData.section} / {opponentData.conference}
-                      </div>
+                      <div style={{ fontSize: 'clamp(9px, 1vw, 12px)' }} className="font-bold text-gray-600">LAST GAME</div>
+                      {opponentData.lastGame ? (
+                        <>
+                          <div style={{ fontSize: 'clamp(10px, 1.1vw, 13px)', wordWrap: 'break-word' }} className="leading-tight">
+                            {opponentData.teamName} <span className={`font-black ${
+                              opponentData.lastGame.result === 'W' ? 'text-green-600' :
+                              opponentData.lastGame.result === 'L' ? 'text-red-600' :
+                              'text-gray-600'
+                            }`}>{opponentData.lastGame.ourScore} - {opponentData.lastGame.oppScore}</span> <span className="font-bold">{opponentData.lastGame.opponent}</span>
+                          </div>
+                          <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)', wordWrap: 'break-word' }} className="text-gray-500">{opponentData.lastGame.date}</div>
+                        </>
+                      ) : (
+                        <div style={{ fontSize: 'clamp(10px, 1.1vw, 13px)' }} className="text-gray-400">N/A</div>
+                      )}
+                    </div>
+                    
+                    <div className="flex-1 flex flex-col justify-center">
+                      <div style={{ fontSize: 'clamp(9px, 1vw, 12px)' }} className="font-bold text-gray-600">NEXT GAME</div>
+                      {opponentData.nextGame && opponentData.nextGame.opponent && opponentData.nextGame.opponent !== 'TBD' ? (
+                        <>
+                          <div style={{ fontSize: 'clamp(10px, 1.1vw, 13px)', wordWrap: 'break-word' }} className="font-bold leading-tight">
+                            {opponentData.nextGame.isHome ? 'VS' : 'AT'} {opponentData.nextGame.opponent}
+                          </div>
+                          <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)', wordWrap: 'break-word' }} className="text-gray-500">
+                            {opponentData.nextGame.date} @ {opponentData.nextGame.time}
+                          </div>
+                        </>
+                      ) : (
+                        <div style={{ fontSize: 'clamp(10px, 1.1vw, 13px)' }} className="text-gray-400">TBD</div>
+                      )}
                     </div>
                   </div>
                 </div>
