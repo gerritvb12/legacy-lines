@@ -452,11 +452,34 @@
                 if (savedCareer) {
                   if (player.position === 'G' && savedCareer.type === 'goalie') {
                     player.baseCareerGoalieStats = savedCareer.data;
-                    player.careerGoalieStats = savedCareer.data;
+                    
+                    // Calculate GAA and SVP for display
+                    const parseMinutes = (minStr) => {
+                      const parts = minStr.split(':');
+                      return parseInt(parts[0]) * 60 + parseInt(parts[1] || 0);
+                    };
+                    const totalSeconds = parseMinutes(savedCareer.data.min || '0:00');
+                    const totalMinutes = totalSeconds / 60;
+                    const totalGA = savedCareer.data.ga || 0;
+                    const totalSV = savedCareer.data.sv || 0;
+                    const totalSOG = totalGA + totalSV;
+                    
+                    player.careerGoalieStats = {
+                      ...savedCareer.data,
+                      gaa: totalMinutes > 0 ? parseFloat((totalGA / (totalMinutes / 51)).toFixed(2)) : 0,
+                      svp: totalSOG > 0 ? (totalSV / totalSOG).toFixed(3) : '.000'
+                    };
                     console.log(`✓ Loaded GOALIE career for ${player.name}`);
                   } else if (savedCareer.type === 'skater') {
                     player.baseCareerStats = savedCareer.data;
-                    player.careerStats = savedCareer.data;
+                    
+                    // Calculate faceoff % for display
+                    const totalFOW = savedCareer.data.fow || 0;
+                    const totalFOL = savedCareer.data.fol || 0;
+                    player.careerStats = {
+                      ...savedCareer.data,
+                      faceoffPct: (totalFOW + totalFOL > 0) ? ((totalFOW / (totalFOW + totalFOL)) * 100).toFixed(1) : '0.0'
+                    };
                     console.log(`✓ Loaded SKATER career for ${player.name}`);
                   }
                 }
