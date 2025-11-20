@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MSHSL Legacy Lines</title>
+    <title>MSHSL Legacy Lines v6.18</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -452,9 +452,11 @@
                 if (savedCareer) {
                   if (player.position === 'G' && savedCareer.type === 'goalie') {
                     player.baseCareerGoalieStats = savedCareer.data;
+                    player.careerGoalieStats = savedCareer.data;
                     console.log(`✓ Loaded GOALIE career for ${player.name}`);
                   } else if (savedCareer.type === 'skater') {
                     player.baseCareerStats = savedCareer.data;
+                    player.careerStats = savedCareer.data;
                     console.log(`✓ Loaded SKATER career for ${player.name}`);
                   }
                 }
@@ -489,7 +491,10 @@
                 if (potentialName && potentialName.length > 2 && 
                     !potentialName.includes('Home') && 
                     !potentialName.includes('Roster') &&
-                    !potentialName.includes('Game')) {
+                    !potentialName.includes('Game') && 
+                    !potentialName.includes('©') &&
+                    !potentialName.includes('SportsEngine') &&
+                    !potentialName.includes('powered by')) {
                   teamName = potentialName;
                   console.log('✅ Found team name:', teamName);
                 }
@@ -500,7 +505,9 @@
                 const homeIdx = lines.findIndex(l => l === 'Home');
                 if (homeIdx > 0) {
                   const potentialName = lines[homeIdx - 1];
-                  if (potentialName && potentialName.length > 2 && potentialName !== 'Delano') {
+                  if (potentialName && potentialName.length > 2 && !potentialName.includes('©') &&
+                      !potentialName.includes('SportsEngine') &&
+                      !potentialName.includes('powered by')) {
                     teamName = potentialName;
                     console.log('✅ Found team name (before Home):', teamName);
                   }
@@ -681,7 +688,7 @@
                 }
               }
               
-              // Parse Next Game - Find SECOND scheduled game (skip the current game which is game #1)
+              // FIX 4: Parse Next Game - Find ALL scheduled games, use SECOND one as 'next game'
               let nextGame = null;
               
               // Find all scheduled games
@@ -731,7 +738,7 @@
               if (scheduledGames.length >= 2) {
                 nextGame = {
                   ...scheduledGames[1],
-                  gameNum: (record.w + record.l + record.t + 2).toString()  // Game 2
+                  gameNum: (record.w + record.l + record.t + 2).toString()  // FIX 4: Game 2
                 };
                 console.log('✓ Next game (Game 2):', nextGame);
               } else if (scheduledGames.length === 1) {
@@ -835,14 +842,29 @@
                     
                     let handed = '';
                     let shoots = '';
-                    for (let j = 4; j < fields.length; j++) {
-                      if (fields[j].includes('Left')) {
+                    
+                    // FIX 2: Extract shoots/handed from correct column
+                    for (let j = 5; j < fields.length; j++) {
+                      const field = fields[j];
+                      if (field === 'LC' || field.includes('Left Catch')) {
                         handed = 'L';
                         shoots = 'L';
+                        console.log(`  → Found shoots: LC for ${name}`);
                         break;
-                      } else if (fields[j].includes('Right')) {
+                      } else if (field === 'RC' || field.includes('Right Catch')) {
                         handed = 'R';
                         shoots = 'R';
+                        console.log(`  → Found shoots: RC for ${name}`);
+                        break;
+                      } else if (field === 'Left' || field === 'L') {
+                        handed = 'L';
+                        shoots = 'L';
+                        console.log(`  → Found shoots: Left for ${name}`);
+                        break;
+                      } else if (field === 'Right' || field === 'R') {
+                        handed = 'R';
+                        shoots = 'R';
+                        console.log(`  → Found shoots: Right for ${name}`);
                         break;
                       }
                     }
@@ -2387,7 +2409,7 @@
                     {myTeamSetup.logo && (
                       <img src={myTeamSetup.logo} alt="Team" className="h-10 w-10 object-contain bg-white rounded p-1" />
                     )}
-                    <h1 className="text-xl font-bold">MSHSL Legacy Lines</h1>
+                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v6.18</h1>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setShowSetup(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
