@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MSHSL Legacy Lines v6.28</title>
+    <title>MSHSL Legacy Lines v6.29</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -790,7 +790,7 @@
                   let time = '';
                   
                   for (let i = nextGameIdx + 1; i < Math.min(lines.length, nextGameIdx + 10); i++) {
-                    if (lines[i] === 'AT') {
+                    if (lines[i] === 'at') {
                       isHome = false;
                       for (let j = i + 1; j < Math.min(lines.length, i + 5); j++) {
                         if (lines[j] && lines[j].length > 2 && lines[j] !== teamName && !lines[j].includes('@')) {
@@ -799,7 +799,7 @@
                         }
                       }
                       break;
-                    } else if (lines[i] === 'VS') {
+                    } else if (lines[i] === 'vs') {
                       isHome = true;
                       for (let j = i + 1; j < Math.min(lines.length, i + 5); j++) {
                         if (lines[j] && lines[j].length > 2 && lines[j] !== teamName && !lines[j].includes('@')) {
@@ -2445,7 +2445,7 @@
                     {myTeamSetup.logo && (
                       <img src={myTeamSetup.logo} alt="Team" className="h-10 w-10 object-contain bg-white rounded p-1" />
                     )}
-                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v6.28</h1>
+                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v6.29</h1>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setShowSetup(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
@@ -2506,7 +2506,7 @@
                       {myTeamData.nextGame && myTeamData.nextGame.opponent && myTeamData.nextGame.opponent !== 'TBD' ? (
                         <>
                           <div style={{ fontSize: 'clamp(10px, 1.1vw, 13px)', wordWrap: 'break-word' }} className="font-bold leading-tight">
-                            {myTeamData.nextGame.isHome ? 'VS' : 'AT'} {myTeamData.nextGame.opponent}
+                            {myTeamData.nextGame.isHome ? 'vs' : 'at'} {myTeamData.nextGame.opponent}
                           </div>
                           <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)', wordWrap: 'break-word' }} className="text-gray-500">
                             {myTeamData.nextGame.date} @ {myTeamData.nextGame.time}
@@ -2684,7 +2684,7 @@
                       {opponentData.nextGame && opponentData.nextGame.opponent && opponentData.nextGame.opponent !== 'TBD' ? (
                         <>
                           <div style={{ fontSize: 'clamp(10px, 1.1vw, 13px)', wordWrap: 'break-word' }} className="font-bold leading-tight">
-                            {opponentData.nextGame.isHome ? 'VS' : 'AT'} {opponentData.nextGame.opponent}
+                            {opponentData.nextGame.isHome ? 'vs' : 'at'} {opponentData.nextGame.opponent}
                           </div>
                           <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)', wordWrap: 'break-word' }} className="text-gray-500">
                             {opponentData.nextGame.date} @ {opponentData.nextGame.time}
