@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MSHSL Legacy Lines v6.30</title>
+    <title>MSHSL Legacy Lines v6.31</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -1982,17 +1982,30 @@
             const player = lines[line][position];
             const isTargeted = selectedPlayer && !player;
             
+            const handleSlotClickOrRemove = () => {
+              if (player) {
+                // Remove player from this position (move back to available)
+                const newLines = {...lines};
+                newLines[line][position] = null;
+                setLines(newLines);
+                setSelectedPlayer(null);
+              } else {
+                handleSlotClick(line, position);
+              }
+            };
+            
             return (
               <div style={{ height: '85px' }}>
                 {showLabel && (
                   <div className="text-xs font-bold text-center mb-0" style={{ fontSize: '11px', marginBottom: '2px' }}>{label}</div>
                 )}
                 <div 
-                  onClick={() => handleSlotClick(line, position)}
+                  onClick={handleSlotClickOrRemove}
                   className={`cursor-pointer transition-colors ${
                     isTargeted ? 'border-2 border-dashed border-blue-500 bg-blue-50 rounded' : ''
                   }`}
                   style={{ height: showLabel ? 'calc(100% - 20px)' : '100%' }}
+                  title={player ? 'Click to remove from line' : 'Click to drop player here'}
                 >
                   {player ? (
                     <PlayerCard player={player} source={{ line, position }} compact={true} />
@@ -2445,7 +2458,7 @@
                     {myTeamSetup.logo && (
                       <img src={myTeamSetup.logo} alt="Team" className="h-10 w-10 object-contain bg-white rounded p-1" />
                     )}
-                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v6.30</h1>
+                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v6.31</h1>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setShowSetup(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
@@ -2684,7 +2697,7 @@
                       {opponentData.nextGame && opponentData.nextGame.opponent && opponentData.nextGame.opponent !== 'TBD' ? (
                         <>
                           <div style={{ fontSize: 'clamp(10px, 1.1vw, 13px)', wordWrap: 'break-word' }} className="font-bold leading-tight">
-                            {opponentData.nextGame.isHome ? 'vs' : 'at'} {opponentData.nextGame.opponent}
+                            {opponentData.nextGame.isHome ? 'at' : 'vs'} {opponentData.nextGame.opponent}
                           </div>
                           <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)', wordWrap: 'break-word' }} className="text-gray-500">
                             {opponentData.nextGame.date} @ {opponentData.nextGame.time}
