@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MSHSL Legacy Lines v7.1</title>
+    <title>MSHSL Legacy Lines v7.2</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -337,8 +337,8 @@
             console.log('=== Parsing spreadsheet paste ===');
             console.log('Raw text length:', text.length);
             
-            const lines = text.split('\').filter(l => l.trim());
-            const rows = lines.map(line => line.split('\'));
+            const lines = text.split('\n').filter(l => l.trim());
+            const rows = lines.map(line => line.split('\t'));
             
             if (rows.length > 0) {
               setSpreadsheetHeaders(rows[0]);
@@ -498,7 +498,7 @@ Loading career stats from localStorage:', Object.keys(careerData).length, 'playe
           // Parsing Functions
           const parseHomePage = (text) => {
             try {
-              const lines = text.split('\').map(l => l.trim()).filter(l => l);
+              const lines = text.split('\n').map(l => l.trim()).filter(l => l);
               let teamName = '';
               let nickname = '';
               let record = { w: 0, l: 0, t: 0 };
@@ -520,7 +520,7 @@ Total lines:', lines.length);
                     !potentialName.includes('Home') && 
                     !potentialName.includes('Roster') &&
                     !potentialName.includes('Game') && 
-                    !potentialName.includes('\'a9') &&
+                    !potentialName.includes(''a9') &&
                     !potentialName.includes('SportsEngine') &&
                     !potentialName.includes('powered by')) {
                   teamName = potentialName;
@@ -534,7 +534,7 @@ Found team name:', teamName);
                 const homeIdx = lines.findIndex(l => l === 'Home');
                 if (homeIdx > 0) {
                   const potentialName = lines[homeIdx - 1];
-                  if (potentialName && potentialName.length > 2 && !potentialName.includes('\'a9') &&
+                  if (potentialName && potentialName.length > 2 && !potentialName.includes(''a9') &&
                       !potentialName.includes('SportsEngine') &&
                       !potentialName.includes('powered by')) {
                     teamName = potentialName;
@@ -589,7 +589,7 @@ Found team record:', record);
                     console.log('
 Found head coach:', headCoach.name, 'with career record:', headCoach.careerRecord);
                     break;
-                  } else if (line.includes('1st Year') || line.includes('1st year') || line.match(/^1st\+(?:season|year)/i)) {
+                  } else if (line.includes('1st Year') || line.includes('1st year') || line.match(/^1st\\s+(?:season|year)/i)) {
                     if (!coachNameFound && i > coachIdx + 1) {
                       headCoach.name = lines[i - 1];
                     }
@@ -859,7 +859,7 @@ Found', scheduledGames.length, 'scheduled games');
           const parseRoster = (text, existingRoster = []) => {
             try {
               console.log('=== parseRoster called ===');
-              const lines = text.split('\').map(l => l.trim()).filter(l => l);
+              const lines = text.split('\n').map(l => l.trim()).filter(l => l);
               console.log('Total lines:', lines.length);
               let roster = [];
               
@@ -867,7 +867,7 @@ Found', scheduledGames.length, 'scheduled games');
                 const line = lines[i];
                 
                 // Try tab-separated first
-                const fields = line.split('\').map(f => f.trim()).filter(f => f);
+                const fields = line.split('\t').map(f => f.trim()).filter(f => f);
                 
                 if (fields.length >= 4) {
                   // Tab-separated format
@@ -916,7 +916,7 @@ Found', scheduledGames.length, 'scheduled games');
                     
                     let dobYear = '';
                     const lastField = fields[fields.length - 1];
-                    const yearMatch = lastField.match(/\(19|20)\{2}\/);
+                    const yearMatch = lastField.match(/\\(19|20)\{2}\/);
                     if (yearMatch) {
                       dobYear = yearMatch[0];
                     }
@@ -968,7 +968,7 @@ Found', scheduledGames.length, 'scheduled games');
                     let shoots = '';
                     
                     // Find year first
-                    const yearMatch = afterGrade.match(/\(19|20)\{2}\/);
+                    const yearMatch = afterGrade.match(/\\(19|20)\{2}\/);
                     if (yearMatch) {
                       // Get everything between grade and year
                       const beforeYear = afterGrade.substring(0, yearMatch.index);
@@ -1040,7 +1040,7 @@ Found', scheduledGames.length, 'scheduled games');
           const parsePlayerStats = (text, existingRoster) => {
             try {
               console.log('=== parsePlayerStats called ===');
-              const lines = text.split('\').map(l => l.trim()).filter(l => l);
+              const lines = text.split('\n').map(l => l.trim()).filter(l => l);
               
               const updatedRoster = [...existingRoster];
               let inSkaterSection = false;
@@ -1062,7 +1062,7 @@ Found', scheduledGames.length, 'scheduled games');
                 
                 if (line === '#' || line === 'Name' || line === 'GP' || line.includes('AVG PTS')) continue;
                 
-                const fields = line.split('\').filter(f => f.trim());
+                const fields = line.split('\t').filter(f => f.trim());
                 
                 if (fields.length < 3) continue;
                 
@@ -1168,7 +1168,7 @@ Found', scheduledGames.length, 'scheduled games');
                 }
               }
               
-              // V7.1 FIX #1: Update stats for players ALREADY IN LINES
+              // V7.2 FIX #1: Update stats for players ALREADY IN LINES
               console.log('🔄 Updating stats for players in lines...');
               setLines(prevLines => {
                 const newLines = { ...prevLines };
@@ -1212,7 +1212,7 @@ Found', scheduledGames.length, 'scheduled games');
           const parseCareerStats = (text, existingRoster) => {
             try {
               console.log('=== parseCareerStats called ===');
-              const lines = text.split('\').map(l => l.trim()).filter(l => l);
+              const lines = text.split('\n').map(l => l.trim()).filter(l => l);
               
               const updatedRoster = [...existingRoster];
               let inSkaterSection = false;
@@ -1234,7 +1234,7 @@ Found', scheduledGames.length, 'scheduled games');
                 
                 if (line === '#' || line === 'Name' || line === 'GP' || line.includes('AVG PTS')) continue;
                 
-                const fields = line.split('\').filter(f => f.trim());
+                const fields = line.split('\t').filter(f => f.trim());
                 
                 if (fields.length < 3) continue;
                 
@@ -1350,7 +1350,7 @@ Found', scheduledGames.length, 'scheduled games');
             try {
               console.log('
 ========== PARSING TEAM STATS ==========');
-              const lines = text.split('\').map(l => l.trim()).filter(l => l);
+              const lines = text.split('\n').map(l => l.trim()).filter(l => l);
               
               let stats = { ppPct: 0, pkPct: 0, gpg: 0, gapg: 0 };
               
@@ -1631,7 +1631,7 @@ SLOT CLICKED:', line, position);
               allSeasons.forEach((seasonText, seasonIdx) => {
                 console.log(`
 Processing season ${seasonIdx + 1}...`);
-                const lines = seasonText.split('\').map(l => l.trim()).filter(l => l);
+                const lines = seasonText.split('\n').map(l => l.trim()).filter(l => l);
                 
                 let inSkaterSection = false;
                 let inGoalieSection = false;
@@ -1652,7 +1652,7 @@ Processing season ${seasonIdx + 1}...`);
                   
                   if (line === '#' || line === 'Name' || line === 'GP' || line.includes('AVG PTS')) continue;
                   
-                  const fields = line.split('\').filter(f => f.trim());
+                  const fields = line.split('\t').filter(f => f.trim());
                   
                   if (fields.length < 3) continue;
                   
@@ -2520,7 +2520,7 @@ Help
                     {myTeamSetup.logo && (
                       <img src={myTeamSetup.logo} alt="Team" className="h-10 w-10 object-contain bg-white rounded p-1" />
                     )}
-                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v7.1</h1>
+                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v7.2</h1>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setShowSetup(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
@@ -2859,11 +2859,11 @@ Opponent Colors
                               placeholder="" 
                               className="w-full border-0 bg-transparent"
                               style={{ fontSize: '9px', padding: '1px', outline: 'none' }}
-                              value={coachNotes.pk?.split('\')[i] || ''}
+                              value={coachNotes.pk?.split('\n')[i] || ''}
                               onChange={(e) => {
-                                const lines = coachNotes.pk?.split('\') || ['','','','',''];
+                                const lines = coachNotes.pk?.split('\n') || ['','','','',''];
                                 lines[i] = e.target.value;
-                                setCoachNotes({...coachNotes, pk: lines.join('\')});
+                                setCoachNotes({...coachNotes, pk: lines.join('')});
                               }}
                             />
                           ))}
@@ -2884,11 +2884,11 @@ Opponent Colors
                               placeholder="" 
                               className="w-full border-0 bg-transparent"
                               style={{ fontSize: '9px', padding: '1px', outline: 'none' }}
-                              value={coachNotes.pp?.split('\')[i] || ''}
+                              value={coachNotes.pp?.split('\n')[i] || ''}
                               onChange={(e) => {
-                                const lines = coachNotes.pp?.split('\') || ['','','','',''];
+                                const lines = coachNotes.pp?.split('\n') || ['','','','',''];
                                 lines[i] = e.target.value;
-                                setCoachNotes({...coachNotes, pp: lines.join('\')});
+                                setCoachNotes({...coachNotes, pp: lines.join('')});
                               }}
                             />
                           ))}
@@ -3130,7 +3130,7 @@ Opponent Colors
                               onClick={() => setDiagramImages({...diagramImages, [key]: null})}
                               className="no-print absolute top-0 right-0 bg-red-500 text-white text-xs px-2 py-1 rounded hover:bg-red-600"
                             >
-                              \'d7
+                              ×
                             </button>
                           </div>
                         ) : (
