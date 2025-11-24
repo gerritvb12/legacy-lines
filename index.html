@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MSHSL Legacy Lines v8.2</title>
+    <title>MSHSL Legacy Lines v8.3</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -1580,10 +1580,10 @@
           };
 
           const convertGradeToText = (grade) => {
-            if (grade === 12 || grade === '12th' || grade === '12') return 'Senior';
-            if (grade === 11 || grade === '11th' || grade === '11') return 'Junior';
-            if (grade === 10 || grade === '10th' || grade === '10') return 'Sophomore';
-            if (grade === 9 || grade === '9th' || grade === '9') return 'Freshman';
+            if (grade === 12 || grade === '12th' || grade === '12') return 'Sr.';
+            if (grade === 11 || grade === '11th' || grade === '11') return 'Jr.';
+            if (grade === 10 || grade === '10th' || grade === '10') return 'So.';
+            if (grade === 9 || grade === '9th' || grade === '9') return 'Fr.';
             return grade;
           };
 
@@ -1767,7 +1767,7 @@
               : '0.0';
             
             const getGradeLabel = (grade) => {
-              const gradeMap = { '9': 'Freshman', '10': 'Sophomore', '11': 'Junior', '12': 'Senior' };
+              const gradeMap = { '9': 'Fr.', '10': 'So.', '11': 'Jr.', '12': 'Sr.' };
               return gradeMap[grade] || grade;
             };
             
@@ -2485,7 +2485,7 @@
                     {myTeamSetup.logo && (
                       <img src={myTeamSetup.logo} alt="Team" className="h-10 w-10 object-contain bg-white rounded p-1" />
                     )}
-                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v8.2</h1>
+                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v8.3</h1>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setShowSetup(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
@@ -2953,18 +2953,18 @@
                           <table className="w-full border-collapse" style={{ fontSize }}>
                             <thead>
                               <tr className="bg-gray-200" style={{ fontSize: '11px', fontWeight: 'bold' }}>
-                                <th className="border p-1" style={{ padding, width: '30px' }}>#</th>
+                                <th className="border p-1" style={{ padding, width: '28px' }}>#</th>
                                 <th className="border p-1 text-left" style={{ padding, maxWidth: '120px', width: '120px' }}>Name</th>
-                                <th className="border p-1" style={{ padding, width: '28px' }}>Gr</th>
-                                <th className="border p-1" style={{ padding, width: '30px' }}>GP</th>
-                                <th className="border p-1" style={{ padding, width: '25px' }}>G</th>
-                                <th className="border p-1" style={{ padding, width: '25px' }}>A</th>
+                                <th className="border p-1" style={{ padding, width: '24px' }}>Gr</th>
+                                <th className="border p-1" style={{ padding, width: '28px' }}>GP</th>
+                                <th className="border p-1" style={{ padding, width: '28px' }}>G</th>
+                                <th className="border p-1" style={{ padding, width: '28px' }}>A</th>
                                 <th className="border p-1" style={{ padding, width: '32px' }}>PTS</th>
-                                <th className="border p-1" style={{ padding, width: '30px' }}>PPG</th>
-                                <th className="border p-1" style={{ padding, width: '30px' }}>PPA</th>
-                                <th className="border p-1" style={{ padding, width: '25px' }}>SH</th>
-                                <th className="border p-1" style={{ padding, width: '30px' }}>SHA</th>
-                                <th className="border p-1" style={{ padding, width: '30px' }}>PIM</th>
+                                <th className="border p-1" style={{ padding, width: '28px' }}>PPG</th>
+                                <th className="border p-1" style={{ padding, width: '28px' }}>PPA</th>
+                                <th className="border p-1" style={{ padding, width: '24px' }}>SH</th>
+                                <th className="border p-1" style={{ padding, width: '28px' }}>SHA</th>
+                                <th className="border p-1" style={{ padding, width: '28px' }}>PIM</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -2989,7 +2989,7 @@
                         </div>
 
                         {/* WHITE SPACE SEPARATOR */}
-                        <div style={{ borderLeft: '2px dashed #ccc', borderRight: '2px dashed #ccc' }}></div>
+                        <div></div>
 
                         {/* DEFENSE + GOALIES */}
                         <div>
@@ -2999,18 +2999,18 @@
                           <table className="w-full border-collapse mb-2" style={{ fontSize }}>
                             <thead>
                               <tr className="bg-gray-200" style={{ fontSize: '11px', fontWeight: 'bold' }}>
-                                <th className="border p-1" style={{ padding, width: '30px' }}>#</th>
+                                <th className="border p-1" style={{ padding, width: '28px' }}>#</th>
                                 <th className="border p-1 text-left" style={{ padding, maxWidth: '120px', width: '120px' }}>Name</th>
-                                <th className="border p-1" style={{ padding, width: '28px' }}>Gr</th>
-                                <th className="border p-1" style={{ padding, width: '30px' }}>GP</th>
-                                <th className="border p-1" style={{ padding, width: '25px' }}>G</th>
-                                <th className="border p-1" style={{ padding, width: '25px' }}>A</th>
+                                <th className="border p-1" style={{ padding, width: '24px' }}>Gr</th>
+                                <th className="border p-1" style={{ padding, width: '28px' }}>GP</th>
+                                <th className="border p-1" style={{ padding, width: '28px' }}>G</th>
+                                <th className="border p-1" style={{ padding, width: '28px' }}>A</th>
                                 <th className="border p-1" style={{ padding, width: '32px' }}>PTS</th>
-                                <th className="border p-1" style={{ padding, width: '30px' }}>PPG</th>
-                                <th className="border p-1" style={{ padding, width: '30px' }}>PPA</th>
-                                <th className="border p-1" style={{ padding, width: '25px' }}>SH</th>
-                                <th className="border p-1" style={{ padding, width: '30px' }}>SHA</th>
-                                <th className="border p-1" style={{ padding, width: '30px' }}>PIM</th>
+                                <th className="border p-1" style={{ padding, width: '28px' }}>PPG</th>
+                                <th className="border p-1" style={{ padding, width: '28px' }}>PPA</th>
+                                <th className="border p-1" style={{ padding, width: '24px' }}>SH</th>
+                                <th className="border p-1" style={{ padding, width: '28px' }}>SHA</th>
+                                <th className="border p-1" style={{ padding, width: '28px' }}>PIM</th>
                               </tr>
                             </thead>
                             <tbody>
