@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MSHSL Legacy Lines v7.4</title>
+    <title>MSHSL Legacy Lines v7.6</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -547,8 +547,8 @@
               for (let i = 0; i < lines.length; i++) {
                 if (lines[i].includes('Team Record') || lines[i] === 'W L T') {
                   for (let j = i + 1; j < i + 5 && j < lines.length; j++) {
-                    const parts = lines[j]?.split(/\+/);
-                    if (parts && parts.length >= 3 && /^\+$/.test(parts[0]) && /^\+$/.test(parts[1]) && /^\+$/.test(parts[2])) {
+                    const parts = lines[j]?.split(/\s+/);
+                    if (parts && parts.length >= 3 && /^\d+$/.test(parts[0]) && /^\d+$/.test(parts[1]) && /^\d+$/.test(parts[2])) {
                       record = { w: parseInt(parts[0]), l: parseInt(parts[1]), t: parseInt(parts[2]) };
                       console.log('Found team record:', record);
                       break;
@@ -564,7 +564,7 @@
                 let coachNameFound = false;
                 for (let i = coachIdx + 1; i < coachIdx + 10 && i < lines.length; i++) {
                   const line = lines[i];
-                  const careerMatch = line.match(/(\+)(?:st|nd|rd|th)?\+(?:season|year)[,\]+(\+)-(\+)-(\+)/i);
+                  const careerMatch = line.match(/(\d+)(?:st|nd|rd|th)?\s+(?:season|year)[,\s]+(\d+)-(\d+)-(\d+)/i);
                   
                   if (careerMatch) {
                     if (!coachNameFound && i > coachIdx + 1) {
@@ -630,8 +630,8 @@
               // Parse stats
               let stats = { ppPct: 0, pkPct: 0, gpg: 0, gapg: 0 };
               for (let i = 0; i < lines.length; i++) {
-                const parts = lines[i].split(/\+/);
-                if (parts.length >= 10 && parts[0].match(/\+/)) {
+                const parts = lines[i].split(/\s+/);
+                if (parts.length >= 10 && parts[0].match(/\d+/)) {
                   stats.gpg = parseFloat(parts[3]) || 0;
                   stats.gapg = parseFloat(parts[4]) || 0;
                   stats.ppPct = parseFloat(parts[6]) || 0;
@@ -645,7 +645,7 @@
               const lastGameIdx = lines.findIndex(l => l === 'Last Game');
               if (lastGameIdx >= 0) {
                 const scoreLine = lines[lastGameIdx + 1];
-                const scoreMatch = scoreLine?.match(/(\+)\*-\*(\+)/);
+                const scoreMatch = scoreLine?.match(/(\d\*-\*(\d)/);
                 
                 if (scoreMatch) {
                   const leftScore = parseInt(scoreMatch[1]);
@@ -657,7 +657,7 @@
                   if (teamHeaderIdx > 0) {
                     for (let i = teamHeaderIdx + 1; i < Math.min(lines.length, teamHeaderIdx + 4); i++) {
                       const line = lines[i];
-                      const teamMatch = line.match(/^([A-Za-z\\/\-]+?)\+\/);
+                      const teamMatch = line.match(/^([A-Za-z\/\s-]+?)\s+\d/);
                       if (teamMatch) {
                         const potentialTeam = teamMatch[1].trim();
                         if (potentialTeam.toLowerCase() !== teamName.toLowerCase()) {
@@ -861,7 +861,7 @@
                   const position = fields[2];
                   const grade = fields[3];
                   
-                  if (/^\+$/.test(number) && /^[FDG]$/.test(position) && /^\{1,2}$/.test(grade)) {
+                  if (/^\d+$/.test(number) && /^[FDG]$/.test(position) && /^\{1,2}$/.test(grade)) {
                     console.log('Found player (tab-separated):', { number, name, position, grade });
                     
                     // Strip (Capt.) or (Capt) from names
@@ -935,7 +935,7 @@
                   // Example: 1Evan GeyenG126' 3"190LC2007
                   //          ^number ^name  ^pos^grade ^height^weight^shoots^year
                   
-                  const concatMatch = line.match(/^(\+)([A-Za-z\\\-'\\.]+?)([FDG])(\{1,2})/);
+                  const concatMatch = line.match(/^(\d+)([A-Za-z\s\-'\.]+?)([FDG])(\d{1,2})/);
                   
                   if (concatMatch) {
                     const number = concatMatch[1];
@@ -1054,7 +1054,7 @@
                 const number = fields[0];
                 const name = fields[1];
                 
-                if (!/^\+$/.test(number)) continue;
+                if (!/^\d+$/.test(number)) continue;
                 
                 if (inSkaterSection) {
                   const player = updatedRoster.find(p => p.number === number && p.position !== 'G');
@@ -1153,7 +1153,7 @@
                 }
               }
               
-              // V7.4 FIX #1: Update stats for players ALREADY IN LINES
+              // V7.6 FIX #1: Update stats for players ALREADY IN LINES
               console.log('🔄 Updating stats for players in lines...');
               setLines(prevLines => {
                 const newLines = { ...prevLines };
@@ -1226,11 +1226,11 @@
                 const number = fields[0];
                 const name = fields[1];
                 
-                if (!/^\+$/.test(number)) continue;
+                if (!/^\d+$/.test(number)) continue;
                 
                 if (inSkaterSection) {
                   const normalizedNumber = number.trim();
-                  const careerNameParts = name.trim().split(/\+/);
+                  const careerNameParts = name.trim().split(/\s+/);
                   const careerFirstInitial = careerNameParts[0]?.charAt(0)?.toUpperCase() || '';
                   const careerLastName = careerNameParts[careerNameParts.length - 1]?.toUpperCase() || '';
                   
@@ -1271,7 +1271,7 @@
                   }
                 } else if (inGoalieSection) {
                   const normalizedNumber = number.trim();
-                  const careerNameParts = name.trim().split(/\+/);
+                  const careerNameParts = name.trim().split(/\s+/);
                   const careerFirstInitial = careerNameParts[0]?.charAt(0)?.toUpperCase() || '';
                   const careerLastName = careerNameParts[careerNameParts.length - 1]?.toUpperCase() || '';
                   
@@ -1348,11 +1348,11 @@
               
               if (headerIdx >= 0) {
                 for (let i = headerIdx + 1; i < headerIdx + 6 && i < lines.length; i++) {
-                  const parts = lines[i].split(/\+/);
+                  const parts = lines[i].split(/\s+/);
                   
                   if (parts.length >= 9 && 
-                      parts[2]?.match(/^\+\\.\+$/) && 
-                      parts[3]?.match(/^\+\\.\+$/)) {
+                      parts[2]?.match(/^\d+\.\d+$/) && 
+                      parts[3]?.match(/^\d+\.\d+$/)) {
                     stats.gpg = parseFloat(parts[2]) || 0;
                     stats.gapg = parseFloat(parts[3]) || 0;
                     stats.ppPct = parseFloat(parts[5]) || 0;
@@ -1639,9 +1639,9 @@ Processing season ${seasonIdx + 1}...`);
                   const number = fields[0];
                   const name = fields[1];
                   
-                  if (!/^\+$/.test(number)) continue;
+                  if (!/^\d+$/.test(number)) continue;
                   
-                  const nameParts = name.trim().split(/\+/);
+                  const nameParts = name.trim().split(/\s+/);
                   const firstInitial = nameParts[0]?.charAt(0)?.toUpperCase() || '';
                   const lastName = nameParts[nameParts.length - 1]?.toUpperCase() || '';
                   const key = `${lastName}_${firstInitial}`;
@@ -2499,7 +2499,7 @@ Help
                     {myTeamSetup.logo && (
                       <img src={myTeamSetup.logo} alt="Team" className="h-10 w-10 object-contain bg-white rounded p-1" />
                     )}
-                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v7.4</h1>
+                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v7.6</h1>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setShowSetup(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
