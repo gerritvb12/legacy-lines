@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MSHSL Legacy Lines v7.2</title>
+    <title>MSHSL Legacy Lines v7.3</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -424,8 +424,7 @@
               });
               
               localStorage.setItem('hockey-scout-career-stats', JSON.stringify(careerData));
-              console.log('
-Saved career stats to localStorage:', Object.keys(careerData).length, 'players');
+              console.log('Saved career stats to localStorage:', Object.keys(careerData).length, 'players');
             } catch (error) {
               console.error('Error saving career stats:', error);
             }
@@ -433,19 +432,16 @@ Saved career stats to localStorage:', Object.keys(careerData).length, 'players')
           
           const loadCareerStatsFromStorage = (roster) => {
             try {
-              console.log('
-loadCareerStatsFromStorage CALLED with roster size:', roster.length);
+              console.log('loadCareerStatsFromStorage CALLED with roster size:', roster.length);
               const stored = localStorage.getItem('hockey-scout-career-stats');
               
               if (!stored) {
-                console.log('
-No career stats in localStorage');
+                console.log('No career stats in localStorage');
                 return roster;
               }
               
               const careerData = JSON.parse(stored);
-              console.log('
-Loading career stats from localStorage:', Object.keys(careerData).length, 'players');
+              console.log('Loading career stats from localStorage:', Object.keys(careerData).length, 'players');
               
               return roster.map(player => {
                 const key = `${player.lastName?.toUpperCase()}_${player.firstName?.charAt(0)?.toUpperCase()}`;
@@ -506,10 +502,8 @@ Loading career stats from localStorage:', Object.keys(careerData).length, 'playe
               let conference = '';
               let headCoach = { name: '', careerRecord: { w: 0, l: 0, t: 0 }, seasonRecord: { w: 0, l: 0, t: 0 } };
               
-              console.log('
-========== PARSING HOME PAGE ==========');
-              console.log('
-Total lines:', lines.length);
+              console.log('========== PARSING HOME PAGE ==========');
+              console.log('Total lines:', lines.length);
               
               // Find team name
               const subscribeIdx = lines.findIndex(l => l === 'Subscribe');
@@ -524,8 +518,7 @@ Total lines:', lines.length);
                     !potentialName.includes('SportsEngine') &&
                     !potentialName.includes('powered by')) {
                   teamName = potentialName;
-                  console.log('
-Found team name:', teamName);
+                  console.log('Found team name:', teamName);
                 }
               }
               
@@ -538,8 +531,7 @@ Found team name:', teamName);
                       !potentialName.includes('SportsEngine') &&
                       !potentialName.includes('powered by')) {
                     teamName = potentialName;
-                    console.log('
-Found team name (before Home):', teamName);
+                    console.log('Found team name (before Home):', teamName);
                   }
                 }
               }
@@ -548,8 +540,7 @@ Found team name (before Home):', teamName);
               const nicknameIdx = lines.findIndex(l => l.startsWith('Nickname:'));
               if (nicknameIdx >= 0) {
                 nickname = lines[nicknameIdx].split(':')[1]?.trim() || '';
-                console.log('
-Found nickname:', nickname);
+                console.log('Found nickname:', nickname);
               }
               
               // Find team record
@@ -559,8 +550,7 @@ Found nickname:', nickname);
                     const parts = lines[j]?.split(/\+/);
                     if (parts && parts.length >= 3 && /^\+$/.test(parts[0]) && /^\+$/.test(parts[1]) && /^\+$/.test(parts[2])) {
                       record = { w: parseInt(parts[0]), l: parseInt(parts[1]), t: parseInt(parts[2]) };
-                      console.log('
-Found team record:', record);
+                      console.log('Found team record:', record);
                       break;
                     }
                   }
@@ -586,16 +576,14 @@ Found team record:', record);
                       l: parseInt(careerMatch[3]), 
                       t: parseInt(careerMatch[4]) 
                     };
-                    console.log('
-Found head coach:', headCoach.name, 'with career record:', headCoach.careerRecord);
+                    console.log('Found head coach:', headCoach.name, 'with career record:', headCoach.careerRecord);
                     break;
                   } else if (line.includes('1st Year') || line.includes('1st year') || line.match(/^1st\\s+(?:season|year)/i)) {
                     if (!coachNameFound && i > coachIdx + 1) {
                       headCoach.name = lines[i - 1];
                     }
                     headCoach.careerRecord = { w: 0, l: 0, t: 0 };
-                    console.log('
-Found first-year head coach:', headCoach.name);
+                    console.log('Found first-year head coach:', headCoach.name);
                     break;
                   } else if (!coachNameFound && line && !line.includes('Head Coach') && line.length > 2 && !line.includes('Phone:')) {
                     headCoach.name = line;
@@ -635,8 +623,7 @@ Found first-year head coach:', headCoach.name);
                 const managersPart = managerLine.split(/Student Managers?:/)[1]?.trim();
                 if (managersPart) {
                   studentManager = managersPart;
-                  console.log('
-Found student managers:', studentManager);
+                  console.log('Found student managers:', studentManager);
                 }
               }
               
@@ -767,8 +754,7 @@ Found student managers:', studentManager);
                 }
               }
               
-              console.log('
-Found', scheduledGames.length, 'scheduled games');
+              console.log('Found', scheduledGames.length, 'scheduled games');
               
               // Use the THIRD game to skip duplicate (Game 3)
               if (scheduledGames.length >= 3) {
@@ -842,8 +828,7 @@ Found', scheduledGames.length, 'scheduled games');
                 }
               }
               
-              console.log('
-========== PARSE COMPLETE ==========');
+              console.log('========== PARSE COMPLETE ==========');
               
               return { teamName, nickname, record, section, conference, headCoach, assistantCoaches, studentManager, stats, lastGame, nextGame };
             } catch (error) {
@@ -1168,7 +1153,7 @@ Found', scheduledGames.length, 'scheduled games');
                 }
               }
               
-              // V7.2 FIX #1: Update stats for players ALREADY IN LINES
+              // V7.3 FIX #1: Update stats for players ALREADY IN LINES
               console.log('🔄 Updating stats for players in lines...');
               setLines(prevLines => {
                 const newLines = { ...prevLines };
@@ -1348,8 +1333,7 @@ Found', scheduledGames.length, 'scheduled games');
 
           const parseTeamStats = (text) => {
             try {
-              console.log('
-========== PARSING TEAM STATS ==========');
+              console.log('========== PARSING TEAM STATS ==========');
               const lines = text.split('\n').map(l => l.trim()).filter(l => l);
               
               let stats = { ppPct: 0, pkPct: 0, gpg: 0, gapg: 0 };
@@ -1373,8 +1357,7 @@ Found', scheduledGames.length, 'scheduled games');
                     stats.gapg = parseFloat(parts[3]) || 0;
                     stats.ppPct = parseFloat(parts[5]) || 0;
                     stats.pkPct = parseFloat(parts[8]) || 0;
-                    console.log('
-Found stats:', stats);
+                    console.log('Found stats:', stats);
                     break;
                   }
                 }
@@ -1455,8 +1438,7 @@ Found stats:', stats);
                 const parsed = parseHomePage(text);
                 setMyTeamData(prev => ({ ...prev, ...parsed }));
               } else if (importStep === 'myTeamRoster') {
-                console.log('
-Importing MY TEAM roster...');
+                console.log('Importing MY TEAM roster...');
                 let roster = parseRoster(text, myTeamData.roster);
                 roster = loadCareerStatsFromStorage(roster);
                 setMyTeamData(prev => ({ ...prev, roster }));
@@ -1573,14 +1555,12 @@ Error in handleImport:', error);
           };
 
           const handlePlayerClick = (player, source) => {
-            console.log('
-PLAYER CLICKED:', player.name, source);
+            console.log('PLAYER CLICKED:', player.name, source);
             setSelectedPlayer({ player, source });
           };
 
           const handleSlotClick = (line, position) => {
-            console.log('
-SLOT CLICKED:', line, position);
+            console.log('SLOT CLICKED:', line, position);
             if (!selectedPlayer) return;
             
             const newLines = { ...lines };
@@ -1752,8 +1732,7 @@ Converting ${name} from skater to goalie`);
               });
               
               localStorage.setItem('hockey-scout-career-stats', JSON.stringify(careerData));
-              console.log('
-Saved career stats to localStorage:', Object.keys(careerData).length, 'players');
+              console.log('Saved career stats to localStorage:', Object.keys(careerData).length, 'players');
               
               alert(`Successfully imported career stats for ${Object.keys(careerData).length} players!\\Career stats saved to browser storage and will automatically load when you import your roster.`);
             } catch (error) {
@@ -2520,7 +2499,7 @@ Help
                     {myTeamSetup.logo && (
                       <img src={myTeamSetup.logo} alt="Team" className="h-10 w-10 object-contain bg-white rounded p-1" />
                     )}
-                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v7.2</h1>
+                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v7.3</h1>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setShowSetup(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
