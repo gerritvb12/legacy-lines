@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MSHSL Legacy Lines v7.3</title>
+    <title>MSHSL Legacy Lines v7.4</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -514,7 +514,7 @@
                     !potentialName.includes('Home') && 
                     !potentialName.includes('Roster') &&
                     !potentialName.includes('Game') && 
-                    !potentialName.includes(''a9') &&
+                    !potentialName.includes('©') &&
                     !potentialName.includes('SportsEngine') &&
                     !potentialName.includes('powered by')) {
                   teamName = potentialName;
@@ -527,7 +527,7 @@
                 const homeIdx = lines.findIndex(l => l === 'Home');
                 if (homeIdx > 0) {
                   const potentialName = lines[homeIdx - 1];
-                  if (potentialName && potentialName.length > 2 && !potentialName.includes(''a9') &&
+                  if (potentialName && potentialName.length > 2 && !potentialName.includes('©') &&
                       !potentialName.includes('SportsEngine') &&
                       !potentialName.includes('powered by')) {
                     teamName = potentialName;
@@ -1153,7 +1153,7 @@
                 }
               }
               
-              // V7.3 FIX #1: Update stats for players ALREADY IN LINES
+              // V7.4 FIX #1: Update stats for players ALREADY IN LINES
               console.log('🔄 Updating stats for players in lines...');
               setLines(prevLines => {
                 const newLines = { ...prevLines };
@@ -2499,7 +2499,7 @@ Help
                     {myTeamSetup.logo && (
                       <img src={myTeamSetup.logo} alt="Team" className="h-10 w-10 object-contain bg-white rounded p-1" />
                     )}
-                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v7.3</h1>
+                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v7.4</h1>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setShowSetup(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
@@ -2663,7 +2663,7 @@ Opponent Colors
                         ({opponentData.record.w}-{opponentData.record.l}-{opponentData.record.t}, {opponentData.section}, {opponentData.conference})
                       </div>
                       
-                      <div style={{ fontSize: 'clamp(11px, 1.4vw, 15px)', fontWeight: '800', marginTop: '4px' }} className="text-gray-600">Game #{(myTeamData.record.w + myTeamData.record.l + myTeamData.record.t + 1)}</div>
+                      <div style={{ fontSize: 'clamp(11px, 1.4vw, 15px)', fontWeight: 0', marginTop: '4px' }} className="text-gray-600">Game #{(myTeamData.record.w + myTeamData.record.l + myTeamData.record.t + 1)}</div>
                     </div>
                   </div>
 
