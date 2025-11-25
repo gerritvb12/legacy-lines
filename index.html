@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MSHSL Legacy Lines v8.8</title>
+    <title>MSHSL Legacy Lines v8.9</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -1789,7 +1789,7 @@
             
             const fontScale = isPreview ? 0.3125 : 1;
             const statFontSize = `${8 * fontScale}pt`;
-            const nameFontSize = `${30 * fontScale}pt`;
+            const nameFontSize = `${22 * fontScale}pt`;
             const infoFontSize = statFontSize;
             const pronunciationFontSize = `${10 * fontScale}pt`;
             
@@ -1815,7 +1815,7 @@
               }
               
               if (nameRef.current) {
-                const baseMaxSize = 30;
+                const baseMaxSize = 22; // Capped lower for consistency across all name lengths
                 const maxNameSize = isPreview ? baseMaxSize * 0.3125 : baseMaxSize;
                 const minNameSize = isPreview ? 3.125 : 10;
                 resizeText(nameRef.current, maxNameSize, minNameSize);
@@ -2492,7 +2492,7 @@
                     {myTeamSetup.logo && (
                       <img src={myTeamSetup.logo} alt="Team" className="h-10 w-10 object-contain bg-white rounded p-1" />
                     )}
-                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v8.8</h1>
+                    <h1 className="text-xl font-bold">MSHSL Legacy Lines v8.9</h1>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setShowSetup(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
@@ -3092,9 +3092,11 @@
                 </div>
 
                 {/* Diagrams & Notes */}
-                <div className="mt-2" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <div className="mt-2" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flexGrow: 1 }}>
                   <h2 style={{ fontSize: '14px', color: 'black' }} className="font-bold mb-1">Pre-Game Preparation - Diagrams & Notes</h2>
                   
+                  {/* Only show diagram area if at least one diagram is uploaded */}
+                  {(diagramImages.image1 || diagramImages.image2 || diagramImages.image3) ? (
                   <div style={{ display: 'flex', gap: '4px', flexGrow: 1 }}>
                     {/* COLUMN 1: Large diagram (60%) */}
                     <div style={{ width: '60%', position: 'relative', display: 'flex', flexDirection: 'column' }}>
@@ -3109,54 +3111,7 @@
                           </button>
                         </div>
                       ) : (
-                        <div className="flex-1 flex flex-col rounded p-1" style={{ position: 'relative', minHeight: '150px' }}>
-                          <img 
-                            src="https://pikwizard.com/pw/medium/c8e0f5f00652b571f445f0f5ff6308f4.png" 
-                            alt="Default Rink" 
-                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'contain', opacity: 0.6 }}
-                          />
-                          <div className="no-print" style={{ position: 'relative', zIndex: 1, backgroundColor: 'rgba(249,250,251,0.95)', borderRadius: '4px', padding: '4px' }}>
-                            <div style={{ fontSize: '9px' }} className="text-gray-600 font-semibold mb-1">Diagram 1</div>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => {
-                                const file = e.target.files[0];
-                                if (file) {
-                                  const reader = new FileReader();
-                                  reader.onload = (event) => {
-                                    setDiagramImages({...diagramImages, image1: event.target.result});
-                                  };
-                                  reader.readAsDataURL(file);
-                                }
-                              }}
-                              className="w-full text-xs mb-1"
-                            />
-                            <div 
-                              style={{ fontSize: '9px', lineHeight: '1.3' }} 
-                              className="text-gray-600 border border-gray-300 rounded p-1 bg-white"
-                              contentEditable
-                              suppressContentEditableWarning
-                              onPaste={(e) => {
-                                const items = e.clipboardData.items;
-                                for (let i = 0; i < items.length; i++) {
-                                  if (items[i].type.indexOf('image') !== -1) {
-                                    e.preventDefault();
-                                    const blob = items[i].getAsFile();
-                                    const reader = new FileReader();
-                                    reader.onload = (event) => {
-                                      setDiagramImages({...diagramImages, image1: event.target.result});
-                                    };
-                                    reader.readAsDataURL(blob);
-                                    break;
-                                  }
-                                }
-                              }}
-                            >
-                              Paste image or notes...
-                            </div>
-                          </div>
-                        </div>
+                        <div className="flex-1" style={{ minHeight: '150px' }}></div>
                       )}
                     </div>
                     
@@ -3173,54 +3128,7 @@
                           </button>
                         </div>
                       ) : (
-                        <div className="flex-1 flex flex-col rounded p-1" style={{ position: 'relative', minHeight: '150px' }}>
-                          <img 
-                            src="https://pikwizard.com/pw/medium/c8e0f5f00652b571f445f0f5ff6308f4.png" 
-                            alt="Default Rink" 
-                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'contain', opacity: 0.6 }}
-                          />
-                          <div className="no-print" style={{ position: 'relative', zIndex: 1, backgroundColor: 'rgba(249,250,251,0.95)', borderRadius: '4px', padding: '4px' }}>
-                            <div style={{ fontSize: '9px' }} className="text-gray-600 font-semibold mb-1">Diagram 2</div>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => {
-                                const file = e.target.files[0];
-                                if (file) {
-                                  const reader = new FileReader();
-                                  reader.onload = (event) => {
-                                    setDiagramImages({...diagramImages, image2: event.target.result});
-                                  };
-                                  reader.readAsDataURL(file);
-                                }
-                              }}
-                              className="w-full text-xs mb-1"
-                            />
-                            <div 
-                              style={{ fontSize: '8px', lineHeight: '1.2' }} 
-                              className="text-gray-600 border border-gray-300 rounded p-1 bg-white"
-                              contentEditable
-                              suppressContentEditableWarning
-                              onPaste={(e) => {
-                                const items = e.clipboardData.items;
-                                for (let i = 0; i < items.length; i++) {
-                                  if (items[i].type.indexOf('image') !== -1) {
-                                    e.preventDefault();
-                                    const blob = items[i].getAsFile();
-                                    const reader = new FileReader();
-                                    reader.onload = (event) => {
-                                      setDiagramImages({...diagramImages, image2: event.target.result});
-                                    };
-                                    reader.readAsDataURL(blob);
-                                    break;
-                                  }
-                                }
-                              }}
-                            >
-                              Paste...
-                            </div>
-                          </div>
-                        </div>
+                        <div className="flex-1" style={{ minHeight: '150px' }}></div>
                       )}
                     </div>
                     
@@ -3237,50 +3145,27 @@
                           </button>
                         </div>
                       ) : (
-                        <div className="flex-1 flex flex-col bg-gray-50 rounded p-1">
-                          <div style={{ fontSize: '9px' }} className="text-gray-600 font-semibold mb-1">Diagram 3</div>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                              const file = e.target.files[0];
-                              if (file) {
-                                const reader = new FileReader();
-                                reader.onload = (event) => {
-                                  setDiagramImages({...diagramImages, image3: event.target.result});
-                                };
-                                reader.readAsDataURL(file);
-                              }
-                            }}
-                            className="no-print w-full text-xs mb-1"
-                          />
-                          <div 
-                            style={{ fontSize: '8px', lineHeight: '1.2' }} 
-                            className="flex-1 text-gray-600 border border-gray-300 rounded p-1 bg-white"
-                            contentEditable
-                            suppressContentEditableWarning
-                            onPaste={(e) => {
-                              const items = e.clipboardData.items;
-                              for (let i = 0; i < items.length; i++) {
-                                if (items[i].type.indexOf('image') !== -1) {
-                                  e.preventDefault();
-                                  const blob = items[i].getAsFile();
-                                  const reader = new FileReader();
-                                  reader.onload = (event) => {
-                                    setDiagramImages({...diagramImages, image3: event.target.result});
-                                  };
-                                  reader.readAsDataURL(blob);
-                                  break;
-                                }
-                              }
-                            }}
-                          >
-                            Paste...
-                          </div>
-                        </div>
+                        <div className="flex-1" style={{ minHeight: '150px' }}></div>
                       )}
                     </div>
                   </div>
+                  ) : (
+                    /* No diagrams uploaded - show simple upload controls (no-print) */
+                    <div className="no-print" style={{ display: 'flex', gap: '4px', flexGrow: 1 }}>
+                      <div style={{ width: '60%' }} className="flex-1 flex flex-col bg-gray-50 rounded p-2">
+                        <div style={{ fontSize: '9px' }} className="text-gray-600 font-semibold mb-1">Diagram 1 (60%)</div>
+                        <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (event) => { setDiagramImages({...diagramImages, image1: event.target.result}); }; reader.readAsDataURL(file); }}} className="w-full text-xs" />
+                      </div>
+                      <div style={{ width: '20%' }} className="flex-1 flex flex-col bg-gray-50 rounded p-2">
+                        <div style={{ fontSize: '9px' }} className="text-gray-600 font-semibold mb-1">Diagram 2 (20%)</div>
+                        <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (event) => { setDiagramImages({...diagramImages, image2: event.target.result}); }; reader.readAsDataURL(file); }}} className="w-full text-xs" />
+                      </div>
+                      <div style={{ width: '20%' }} className="flex-1 flex flex-col bg-gray-50 rounded p-2">
+                        <div style={{ fontSize: '9px' }} className="text-gray-600 font-semibold mb-1">Diagram 3 (20%)</div>
+                        <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (event) => { setDiagramImages({...diagramImages, image3: event.target.result}); }; reader.readAsDataURL(file); }}} className="w-full text-xs" />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Creator Credit - pushed to bottom of page */}
