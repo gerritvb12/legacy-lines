@@ -651,62 +651,92 @@
                   const leftScore = parseInt(scoreMatch[1]);
                   const rightScore = parseInt(scoreMatch[2]);
                   
+                  // Find the two teams in the Last Game display
+                  // Legacy shows: [Left Team Logo] [Score] - [Score] [Right Team Logo]
+                  // Below that: [Left Team Abbrev]          [Right Team Abbrev]
+                  // The team listed SECOND (right side) is the HOME team
+                  
+                  let leftTeam = '';
+                  let rightTeam = '';
                   let opponent = '';
-                  const teamHeaderIdx = lines.findIndex((l, idx) => idx > lastGameIdx && l.includes('Team') && l.includes('1') && l.includes('2'));
+                  let isOurTeamOnRight = false;
                   
-                  if (teamHeaderIdx > 0) {
-                    for (let i = teamHeaderIdx + 1; i < Math.min(lines.length, teamHeaderIdx + 4); i++) {
+                  // Look for team abbreviations after "Final" line
+                  const finalIdx = lines.findIndex((l, idx) => idx > lastGameIdx && l === 'Final');
+                  if (finalIdx > 0) {
+                    // Teams are usually on lines after Final
+                    for (let i = finalIdx + 1; i < Math.min(lines.length, finalIdx + 6); i++) {
                       const line = lines[i];
-                      const teamMatch = line.match(/^([A-Za-z\/\s-]+?)\s+\d/);
-                      if (teamMatch) {
-                        const potentialTeam = teamMatch[1].trim();
-                        if (potentialTeam.toLowerCase() !== teamName.toLowerCase()) {
-                          opponent = potentialTeam.split(' ').map(word => 
-                            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-                          ).join(' ');
+                      if (line && line.length > 2 && !line.includes('202') && !line.includes('@') && !line.includes('|')) {
+                        if (!leftTeam) {
+                          leftTeam = line.trim();
+                        } else if (!rightTeam) {
+                          rightTeam = line.trim();
                           break;
                         }
                       }
                     }
                   }
                   
-                  if (!opponent) {
-                    const finalIdx = lines.findIndex((l, idx) => idx > lastGameIdx && l === 'Final');
-                    if (finalIdx > 0) {
-                      for (let i = finalIdx + 1; i < Math.min(lines.length, finalIdx + 4); i++) {
-                        const line = lines[i];
-                        if (line && line.length > 2 && line !== teamName && !line.includes('202') && !line.includes('@')) {
-                          opponent = line.split(' ').map(word => 
-                            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-                          ).join(' ');
-                          break;
-                        }
-                      }
-                    }
+                  // Determine which side our team is on
+                  const teamNameLower = teamName.toLowerCase();
+                  const leftTeamLower = leftTeam.toLowerCase();
+                  const rightTeamLower = rightTeam.toLowerCase();
+                  
+                  if (rightTeamLower.includes(teamNameLower.substring(0, 4)) || 
+                      teamNameLower.includes(rightTeamLower.substring(0, 4))) {
+                    // Our team is on the RIGHT
+                    isOurTeamOnRight = true;
+                    opponent = leftTeam;
+                  } else {
+                    // Our team is on the LEFT
+                    isOurTeamOnRight = false;
+                    opponent = rightTeam;
                   }
+                  
+                  // Format opponent name properly
+                  if (opponent) {
+                    opponent = opponent.split(' ').map(word => 
+                      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                    ).join(' ');
+                  }
+                  
+                  // Assign scores based on team position
+                  // Left score belongs to left team, right score belongs to right team
+                  const ourScore = isOurTeamOnRight ? rightScore : leftScore;
+                  const oppScore = isOurTeamOnRight ? leftScore : rightScore;
+                  
+                  // Determine if our team was home (right side = home = "vs")
+                  const wasHome = isOurTeamOnRight;
                   
                   let date = '';
-                  let location = '';
                   for (let i = lastGameIdx + 3; i < Math.min(lines.length, lastGameIdx + 15); i++) {
                     if (lines[i].includes('@') && lines[i].includes('202')) {
-                      const parts = lines[i].split('|');
-                      date = parts[0]?.trim() || lines[i];
-                      location = parts[1]?.trim() || '';
+                      // Just get the date/time part, not the venue
+                      const fullLine = lines[i];
+                      // Extract just "Sat Nov 22, 2025 @ 2:30p" part
+                      const dateMatch = fullLine.match(/^([A-Za-z]{3}\s+[A-Za-z]{3}\s+\d{1,2},?\s+\d{4}\s*@\s*\d{1,2}:\d{2}[ap]?m?)/i);
+                      if (dateMatch) {
+                        date = dateMatch[1];
+                      } else {
+                        // Fallback - just take up to the time
+                        const parts = fullLine.split(/\s+(?=[A-Z][a-z]+\s+[A-Z])/);
+                        date = parts[0]?.trim() || fullLine;
+                      }
                       break;
                     }
                   }
-                  
-                  const ourScore = leftScore;
-                  const oppScore = rightScore;
                   
                   lastGame = {
                     opponent,
                     ourScore,
                     oppScore,
                     result: ourScore > oppScore ? 'W' : ourScore < oppScore ? 'L' : 'T',
-                    date,
-                    location
+                    wasHome,
+                    date
                   };
+                  
+                  console.log('🏒 Last Game parsed:', { leftTeam, rightTeam, leftScore, rightScore, isOurTeamOnRight, ourScore, oppScore, result: lastGame.result });
                 }
               }
               
@@ -2555,9 +2585,9 @@
                               myTeamData.lastGame.result === 'W' ? 'text-green-600' :
                               myTeamData.lastGame.result === 'L' ? 'text-red-600' :
                               'text-gray-600'
-                            }`}>{myTeamData.lastGame.ourScore} - {myTeamData.lastGame.oppScore}</span> <span className="font-bold">{myTeamData.lastGame.opponent}</span>
+                            }`}>{myTeamData.lastGame.ourScore} - {myTeamData.lastGame.oppScore}</span> {myTeamData.lastGame.opponent}
                           </div>
-                          <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)', wordWrap: 'break-word' }} className="text-gray-500">{myTeamData.lastGame.date}{myTeamData.lastGame.location ? ` ${myTeamData.lastGame.location}` : ''}</div>
+                          <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)', wordWrap: 'break-word' }} className="text-gray-500">{myTeamData.lastGame.date}</div>
                         </>
                       ) : (
                         <div style={{ fontSize: 'clamp(10px, 1.1vw, 13px)' }} className="text-gray-400">N/A</div>
@@ -2572,7 +2602,7 @@
                             {myTeamData.nextGame.isHome ? 'vs' : 'at'} {myTeamData.nextGame.opponent}
                           </div>
                           <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)', wordWrap: 'break-word' }} className="text-gray-500">
-                            {myTeamData.nextGame.date} @ {myTeamData.nextGame.time}{myTeamData.nextGame.location ? ` ${myTeamData.nextGame.location}` : ''}
+                            {myTeamData.nextGame.date} @ {myTeamData.nextGame.time}
                           </div>
                         </>
                       ) : (
@@ -2733,9 +2763,9 @@
                               opponentData.lastGame.result === 'W' ? 'text-green-600' :
                               opponentData.lastGame.result === 'L' ? 'text-red-600' :
                               'text-gray-600'
-                            }`}>{opponentData.lastGame.ourScore} - {opponentData.lastGame.oppScore}</span> <span className="font-bold">{opponentData.lastGame.opponent}</span>
+                            }`}>{opponentData.lastGame.ourScore} - {opponentData.lastGame.oppScore}</span> {opponentData.lastGame.opponent}
                           </div>
-                          <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)', wordWrap: 'break-word' }} className="text-gray-500">{opponentData.lastGame.date}{opponentData.lastGame.location ? ` ${opponentData.lastGame.location}` : ''}</div>
+                          <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)', wordWrap: 'break-word' }} className="text-gray-500">{opponentData.lastGame.date}</div>
                         </>
                       ) : (
                         <div style={{ fontSize: 'clamp(10px, 1.1vw, 13px)' }} className="text-gray-400">N/A</div>
@@ -2750,7 +2780,7 @@
                             {opponentData.nextGame.isHome ? 'vs' : 'at'} {opponentData.nextGame.opponent}
                           </div>
                           <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)', wordWrap: 'break-word' }} className="text-gray-500">
-                            {opponentData.nextGame.date} @ {opponentData.nextGame.time}{opponentData.nextGame.location ? ` ${opponentData.nextGame.location}` : ''}
+                            {opponentData.nextGame.date} @ {opponentData.nextGame.time}
                           </div>
                         </>
                       ) : (
