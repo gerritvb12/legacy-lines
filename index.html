@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MSHSL Legacy Lines v9.1</title>
+    <title>MSHSL Legacy Lines v9.2</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -721,10 +721,11 @@
                   let opponent = '';
                   let date = '';
                   let time = '';
+                  let location = '';
                   let isHome = false;
                   
                   // Check previous lines for opponent and date/time
-                  for (let j = Math.max(0, i - 5); j < i; j++) {
+                  for (let j = Math.max(0, i - 8); j < i; j++) {
                     const line = lines[j];
                     
                     // Date/time line format: "Sat Nov 22 @ 2:00pm"
@@ -734,22 +735,34 @@
                       time = parts[1]?.trim() || '';
                     }
                     
+                    // Location line - typically follows the date/time and contains arena name
+                    if (line && !line.includes('@') && !line.includes('-') && !line.match(/^\d/) && 
+                        line !== 'Scheduled' && line.length > 5 && 
+                        (line.includes('Arena') || line.includes('Center') || line.includes('Ice') || 
+                         line.includes('Rink') || line.includes('Complex') || line.includes(',') ||
+                         line.includes('Coliseum') || line.includes('Civic') || line.includes('Pavilion'))) {
+                      location = line;
+                    }
+                    
                     // Opponent line - look for team names (not "Delano-" or current team)
                     if (line && line.length > 2 && !line.includes(teamName) && !line.includes('@') && 
                         !line.match(/^\d/) && line !== 'Scheduled' && !line.includes(':')) {
                       if (line.endsWith('-')) {
                         opponent = line.slice(0, -1).trim();
-                        // Determine home/away
-                        const delanoline = lines[j-1];
-                        if (delanoline && delanoline.includes(teamName + '-')) {
-                          isHome = false;  // Team listed first = AWAY game
+                        // Determine home/away: team listed SECOND is HOME
+                        // If opponent is on a line ending with '-', check if our team is AFTER it
+                        const nextLine = lines[j+1];
+                        if (nextLine && nextLine.includes(teamName)) {
+                          isHome = true;  // Our team listed second = HOME game = "vs"
+                        } else {
+                          isHome = false; // Our team listed first = AWAY game = "at"
                         }
                       }
                     }
                   }
                   
                   if (opponent && date) {
-                    scheduledGames.push({ opponent, isHome, date, time });
+                    scheduledGames.push({ opponent, isHome, date, time, location });
                   }
                 }
               }
@@ -776,6 +789,7 @@
                   isHome: false,
                   date: '',
                   time: '',
+                  location: '',
                   gameNum: (record.w + record.l + record.t + 2).toString()
                 };
               } else {
@@ -786,6 +800,7 @@
                   let isHome = false;
                   let date = '';
                   let time = '';
+                  let location = '';
                   
                   for (let i = nextGameIdx + 1; i < Math.min(lines.length, nextGameIdx + 10); i++) {
                     if (lines[i] === 'at') {
@@ -814,7 +829,12 @@
                       const parts = lines[i].split('@');
                       date = parts[0]?.trim() || '';
                       time = parts[1]?.trim() || '';
-                      break;
+                    }
+                    // Look for location
+                    if (lines[i] && !lines[i].includes('@') && !lines[i].includes('-') && 
+                        (lines[i].includes('Arena') || lines[i].includes('Center') || lines[i].includes('Ice') || 
+                         lines[i].includes('Rink') || lines[i].includes(',') || lines[i].includes('Complex'))) {
+                      location = lines[i];
                     }
                   }
                   
@@ -823,6 +843,7 @@
                     isHome,
                     date,
                     time,
+                    location,
                     gameNum: (record.w + record.l + record.t + 1).toString()
                   };
                 }
@@ -2536,7 +2557,7 @@
                               'text-gray-600'
                             }`}>{myTeamData.lastGame.ourScore} - {myTeamData.lastGame.oppScore}</span> <span className="font-bold">{myTeamData.lastGame.opponent}</span>
                           </div>
-                          <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)', wordWrap: 'break-word' }} className="text-gray-500">{myTeamData.lastGame.date}</div>
+                          <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)', wordWrap: 'break-word' }} className="text-gray-500">{myTeamData.lastGame.date}{myTeamData.lastGame.location ? ` ${myTeamData.lastGame.location}` : ''}</div>
                         </>
                       ) : (
                         <div style={{ fontSize: 'clamp(10px, 1.1vw, 13px)' }} className="text-gray-400">N/A</div>
@@ -2551,7 +2572,7 @@
                             {myTeamData.nextGame.isHome ? 'vs' : 'at'} {myTeamData.nextGame.opponent}
                           </div>
                           <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)', wordWrap: 'break-word' }} className="text-gray-500">
-                            {myTeamData.nextGame.date} @ {myTeamData.nextGame.time}
+                            {myTeamData.nextGame.date} @ {myTeamData.nextGame.time}{myTeamData.nextGame.location ? ` ${myTeamData.nextGame.location}` : ''}
                           </div>
                         </>
                       ) : (
@@ -2714,7 +2735,7 @@
                               'text-gray-600'
                             }`}>{opponentData.lastGame.ourScore} - {opponentData.lastGame.oppScore}</span> <span className="font-bold">{opponentData.lastGame.opponent}</span>
                           </div>
-                          <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)', wordWrap: 'break-word' }} className="text-gray-500">{opponentData.lastGame.date}</div>
+                          <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)', wordWrap: 'break-word' }} className="text-gray-500">{opponentData.lastGame.date}{opponentData.lastGame.location ? ` ${opponentData.lastGame.location}` : ''}</div>
                         </>
                       ) : (
                         <div style={{ fontSize: 'clamp(10px, 1.1vw, 13px)' }} className="text-gray-400">N/A</div>
@@ -2726,10 +2747,10 @@
                       {opponentData.nextGame && opponentData.nextGame.opponent && opponentData.nextGame.opponent !== 'TBD' ? (
                         <>
                           <div style={{ fontSize: 'clamp(10px, 1.1vw, 13px)', wordWrap: 'break-word' }} className="font-bold leading-tight">
-                            {opponentData.nextGame.isHome ? 'at' : 'vs'} {opponentData.nextGame.opponent}
+                            {opponentData.nextGame.isHome ? 'vs' : 'at'} {opponentData.nextGame.opponent}
                           </div>
                           <div style={{ fontSize: 'clamp(8px, 0.9vw, 10px)', wordWrap: 'break-word' }} className="text-gray-500">
-                            {opponentData.nextGame.date} @ {opponentData.nextGame.time}
+                            {opponentData.nextGame.date} @ {opponentData.nextGame.time}{opponentData.nextGame.location ? ` ${opponentData.nextGame.location}` : ''}
                           </div>
                         </>
                       ) : (
@@ -2870,13 +2891,13 @@
                     backgroundColor: `${myTeamSetup.colors.primary}15`,
                     border: `2px solid ${myTeamSetup.colors.primary}`
                   }}>
-                    <span style={{ fontSize: '12px' }} className="font-bold mr-2">Student Manager</span>
+                    <span style={{ fontSize: '12px' }} className="font-bold mr-2">Student Manager(s)</span>
                     <input
                       type="text"
                       value={myTeamData.studentManager}
                       onChange={(e) => setMyTeamData({...myTeamData, studentManager: e.target.value})}
                       placeholder="Name"
-                      className="border-0 bg-transparent flex-1"
+                      className="border-0 bg-transparent flex-1 placeholder-print-hide"
                       style={{ outline: 'none', fontSize: '12px' }}
                     />
                   </div>
@@ -2887,7 +2908,7 @@
                       value={myTeamData.injuries || ''}
                       onChange={(e) => setMyTeamData({...myTeamData, injuries: e.target.value})}
                       placeholder="Enter injured/illness notes"
-                      className="border-0 bg-transparent flex-1"
+                      className="border-0 bg-transparent flex-1 placeholder-print-hide"
                       style={{ outline: 'none', fontSize: '12px' }}
                     />
                   </div>
@@ -3275,6 +3296,10 @@
                 @media print {
                   .no-print {
                     display: none !important;
+                  }
+                  
+                  .placeholder-print-hide::placeholder {
+                    color: transparent !important;
                   }
                   
                   body {
