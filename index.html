@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Legacy Line Charts</title>
+    <title>Legacy Line Charts v9.5</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -651,48 +651,49 @@
                   const leftScore = parseInt(scoreMatch[1]);
                   const rightScore = parseInt(scoreMatch[2]);
                   
-                  // Find the two teams in the Last Game display
-                  // Legacy shows: [Left Team Logo] [Score] - [Score] [Right Team Logo]
-                  // Below that: [Left Team Abbrev]          [Right Team Abbrev]
-                  // The team listed SECOND (right side) is the HOME team
+                  // Find opponent from the box score table
+                  // Look for lines with period scores like "Rosemount	1	2	1	4" or "Park of Cottage Grove	0	2	0	2"
+                  // The opponent is the team that is NOT our team
                   
-                  let leftTeam = '';
-                  let rightTeam = '';
                   let opponent = '';
-                  let isOurTeamOnRight = false;
+                  let ourTeamInTable = '';
+                  let opponentInTable = '';
+                  let isOurTeamFirst = false;
                   
-                  // Look for team abbreviations after "Final" line
-                  const finalIdx = lines.findIndex((l, idx) => idx > lastGameIdx && l === 'Final');
-                  if (finalIdx > 0) {
-                    // Teams are usually on lines after Final
-                    for (let i = finalIdx + 1; i < Math.min(lines.length, finalIdx + 6); i++) {
+                  // Find the "Team" header line which indicates the box score table
+                  const teamHeaderIdx = lines.findIndex((l, idx) => idx > lastGameIdx && l.includes('Team') && (l.includes('1') || l.includes('T')));
+                  
+                  if (teamHeaderIdx > 0) {
+                    // Look at the next few lines for team names with scores
+                    for (let i = teamHeaderIdx + 1; i < Math.min(lines.length, teamHeaderIdx + 5); i++) {
                       const line = lines[i];
-                      if (line && line.length > 2 && !line.includes('202') && !line.includes('@') && !line.includes('|')) {
-                        if (!leftTeam) {
-                          leftTeam = line.trim();
-                        } else if (!rightTeam) {
-                          rightTeam = line.trim();
-                          break;
+                      // Match lines that have a team name followed by period scores (numbers separated by tabs/spaces)
+                      // e.g., "Rosemount	1	2	1	4" or " Park of Cottage Grove	0	2	0	2"
+                      const tableMatch = line.match(/^\s*([A-Za-z][A-Za-z\s\/\-\.of]+?)\s+\d+\s+\d+/);
+                      if (tableMatch) {
+                        const foundTeam = tableMatch[1].trim();
+                        // Check if this is our team or opponent
+                        if (foundTeam.toLowerCase().includes(teamName.toLowerCase().substring(0, 4)) ||
+                            teamName.toLowerCase().includes(foundTeam.toLowerCase().substring(0, 4))) {
+                          ourTeamInTable = foundTeam;
+                          if (!opponentInTable) {
+                            isOurTeamFirst = true;
+                          }
+                        } else {
+                          opponentInTable = foundTeam;
                         }
                       }
                     }
                   }
                   
-                  // Determine which side our team is on
-                  const teamNameLower = teamName.toLowerCase();
-                  const leftTeamLower = leftTeam.toLowerCase();
-                  const rightTeamLower = rightTeam.toLowerCase();
+                  // Use the opponent found in the table
+                  opponent = opponentInTable;
                   
-                  if (rightTeamLower.includes(teamNameLower.substring(0, 4)) || 
-                      teamNameLower.includes(rightTeamLower.substring(0, 4))) {
-                    // Our team is on the RIGHT
-                    isOurTeamOnRight = true;
-                    opponent = leftTeam;
-                  } else {
-                    // Our team is on the LEFT
-                    isOurTeamOnRight = false;
-                    opponent = rightTeam;
-                  }
+                  // In Legacy's display: left score is AWAY team, right score is HOME team
+                  // In the box score table: first team listed is typically the AWAY team
+                  // So if our team is listed FIRST, we were AWAY (left score is ours)
+                  // If our team is listed SECOND, we were HOME (right score is ours)
+                  const isOurTeamOnRight = !isOurTeamFirst;
                   
                   // Format opponent name properly
                   if (opponent) {
@@ -702,7 +703,7 @@
                   }
                   
                   // Assign scores based on team position
-                  // Left score belongs to left team, right score belongs to right team
+                  // Left score = away team score, Right score = home team score
                   const ourScore = isOurTeamOnRight ? rightScore : leftScore;
                   const oppScore = isOurTeamOnRight ? leftScore : rightScore;
                   
@@ -710,7 +711,7 @@
                   const wasHome = isOurTeamOnRight;
                   
                   let date = '';
-                  for (let i = lastGameIdx + 3; i < Math.min(lines.length, lastGameIdx + 15); i++) {
+                  for (let i = lastGameIdx + 3; i < Math.min(lines.length, lastGameIdx + 25); i++) {
                     if (lines[i].includes('@') && lines[i].includes('202')) {
                       // Just get the date/time part, not the venue
                       const fullLine = lines[i];
@@ -736,7 +737,7 @@
                     date
                   };
                   
-                  console.log('🏒 Last Game parsed:', { leftTeam, rightTeam, leftScore, rightScore, isOurTeamOnRight, ourScore, oppScore, result: lastGame.result });
+                  console.log('🏒 Last Game parsed:', { ourTeamInTable, opponentInTable, isOurTeamFirst, leftScore, rightScore, ourScore, oppScore, result: lastGame.result });
                 }
               }
               
