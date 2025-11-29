@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Legacy Line Charts v10.0</title>
+    <title>Legacy Line Charts v10.1</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -342,7 +342,7 @@
             const exportObj = {
               _exportInfo: {
                 exportDate: new Date().toISOString(),
-                version: '10.0',
+                version: '10.1',
                 teamName: myTeamSetup.teamName
               },
               myTeamSetup: myTeamSetup
@@ -438,7 +438,9 @@
             try {
               const careerData = {};
               roster.forEach(player => {
-                const key = `${player.lastName?.toUpperCase()}_${player.firstName?.charAt(0)?.toUpperCase()}`;
+                // Use first 3 chars of first name to distinguish siblings (e.g., MCCABE_JON vs MCCABE_JOE)
+                const firstNameKey = player.firstName?.substring(0, 3)?.toUpperCase() || '';
+                const key = `${player.lastName?.toUpperCase()}_${firstNameKey}`;
                 
                 if (player.baseCareerStats && player.baseCareerStats.gp > 0) {
                   careerData[key] = {
@@ -476,7 +478,9 @@
               console.log('📂 Loading career stats from localStorage:', Object.keys(careerData).length, 'players');
               
               return roster.map(player => {
-                const key = `${player.lastName?.toUpperCase()}_${player.firstName?.charAt(0)?.toUpperCase()}`;
+                // Use first 3 chars of first name to distinguish siblings (e.g., MCCABE_JON vs MCCABE_JOE)
+                const firstNameKey = player.firstName?.substring(0, 3)?.toUpperCase() || '';
+                const key = `${player.lastName?.toUpperCase()}_${firstNameKey}`;
                 const savedCareer = careerData[key];
                 
                 if (savedCareer) {
@@ -990,9 +994,10 @@
                       dobYear = yearMatch[0];
                     }
                     
+                    // Use first 3 chars to distinguish siblings (e.g., Jonny vs Joe McCabe)
                     const existingPlayer = existingRoster.find(p => 
                       p.lastName?.toUpperCase() === lastName.toUpperCase() && 
-                      p.firstName?.charAt(0)?.toUpperCase() === firstName.charAt(0)?.toUpperCase()
+                      p.firstName?.substring(0, 3)?.toUpperCase() === firstName.substring(0, 3)?.toUpperCase()
                     );
                     
                     roster.push({
@@ -1072,9 +1077,10 @@
                     const lastName = nameParts[nameParts.length - 1];
                     const firstName = nameParts.slice(0, -1).join(' ');
                     
+                    // Use first 3 chars to distinguish siblings (e.g., Jonny vs Joe McCabe)
                     const existingPlayer = existingRoster.find(p => 
                       p.lastName?.toUpperCase() === lastName.toUpperCase() && 
-                      p.firstName?.charAt(0)?.toUpperCase() === firstName.charAt(0)?.toUpperCase()
+                      p.firstName?.substring(0, 3)?.toUpperCase() === firstName.substring(0, 3)?.toUpperCase()
                     );
                     
                     roster.push({
@@ -1311,16 +1317,17 @@
                   const normalizedNumber = number.trim();
                   const cleanCareerName = name.replace(/\s*\(Capt\.?\)/i, '').replace(/\*/g, '').trim();
                   const careerNameParts = cleanCareerName.split(/\s+/);
-                  const careerFirstInitial = careerNameParts[0]?.charAt(0)?.toUpperCase() || '';
+                  // Use first 3 chars to distinguish siblings (e.g., Jonny vs Joe McCabe)
+                  const careerFirstChars = careerNameParts[0]?.substring(0, 3)?.toUpperCase() || '';
                   const careerLastName = careerNameParts[careerNameParts.length - 1]?.toUpperCase() || '';
                   
                   let player = updatedRoster.find(p => {
                     if (p.position === 'G') return false;
                     
-                    const rosterFirstInitial = p.firstName?.charAt(0)?.toUpperCase() || '';
+                    const rosterFirstChars = p.firstName?.substring(0, 3)?.toUpperCase() || '';
                     const rosterLastName = p.lastName?.toUpperCase() || '';
                     
-                    const nameMatch = rosterLastName === careerLastName && rosterFirstInitial === careerFirstInitial;
+                    const nameMatch = rosterLastName === careerLastName && rosterFirstChars === careerFirstChars;
                     const numberMatch = p.number.toString().trim() === normalizedNumber;
                     
                     return nameMatch || numberMatch;
@@ -1353,16 +1360,17 @@
                   const normalizedNumber = number.trim();
                   const cleanCareerName = name.replace(/\s*\(Capt\.?\)/i, '').replace(/\*/g, '').trim();
                   const careerNameParts = cleanCareerName.split(/\s+/);
-                  const careerFirstInitial = careerNameParts[0]?.charAt(0)?.toUpperCase() || '';
+                  // Use first 3 chars to distinguish siblings (e.g., Jonny vs Joe McCabe)
+                  const careerFirstChars = careerNameParts[0]?.substring(0, 3)?.toUpperCase() || '';
                   const careerLastName = careerNameParts[careerNameParts.length - 1]?.toUpperCase() || '';
                   
                   let player = updatedRoster.find(p => {
                     if (p.position !== 'G') return false;
                     
-                    const rosterFirstInitial = p.firstName?.charAt(0)?.toUpperCase() || '';
+                    const rosterFirstChars = p.firstName?.substring(0, 3)?.toUpperCase() || '';
                     const rosterLastName = p.lastName?.toUpperCase() || '';
                     
-                    const nameMatch = rosterLastName === careerLastName && rosterFirstInitial === careerFirstInitial;
+                    const nameMatch = rosterLastName === careerLastName && rosterFirstChars === careerFirstChars;
                     const numberMatch = p.number.toString().trim() === normalizedNumber;
                     
                     return nameMatch || numberMatch;
@@ -1721,9 +1729,10 @@
                   if (!/^\d+$/.test(number)) continue;
                   
                   const nameParts = name.trim().split(/\s+/);
-                  const firstInitial = nameParts[0]?.charAt(0)?.toUpperCase() || '';
+                  // Use first 3 chars to distinguish siblings (e.g., Jonny vs Joe McCabe)
+                  const firstChars = nameParts[0]?.substring(0, 3)?.toUpperCase() || '';
                   const lastName = nameParts[nameParts.length - 1]?.toUpperCase() || '';
-                  const key = `${lastName}_${firstInitial}`;
+                  const key = `${lastName}_${firstChars}`;
                   
                   if (inSkaterSection && fields.length >= 6) {
                     const seasonGP = parseInt(fields[2]) || 0;
