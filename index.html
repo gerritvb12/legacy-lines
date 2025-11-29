@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Legacy Line Charts v10.3</title>
+    <title>Legacy Line Charts v10.4</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -343,7 +343,7 @@
             const exportObj = {
               _exportInfo: {
                 exportDate: new Date().toISOString(),
-                version: '10.3',
+                version: '10.4',
                 teamName: myTeamSetup.teamName
               },
               myTeamSetup: myTeamSetup
@@ -1632,6 +1632,26 @@
           const handleSaveAndClose = () => {
             if (importText.trim()) {
               try {
+                // Check for Safari browser (ALL CAPS indicates Safari paste)
+                if (importStep === 'myTeamHome') {
+                  const hasSafariCaps = importText.includes('HEAD COACH') || 
+                                        importText.includes('TEAM STATISTICS') || 
+                                        importText.includes('TEAM INFORMATION');
+                  if (hasSafariCaps) {
+                    alert('🚫 Coach, sorry for the inconvenience, but Legacy Line Charts is not compatible with Safari.\n\n🌐 Please use Google Chrome or Microsoft Edge for the best experience.');
+                    return;
+                  }
+                  
+                  // Check if not logged in (has "Login" near the top)
+                  const first500Chars = importText.substring(0, 500);
+                  const hasLoginPrompt = first500Chars.includes('Login') && 
+                                         first500Chars.includes('Create an Account');
+                  if (hasLoginPrompt) {
+                    alert('🔐 Coach, sorry for the inconvenience, but you need to log in to your Legacy Hockey team\'s page.\n\n⚠️ Keep Edit Mode OFF after logging in.\n\n👉 Log in, then copy and paste again.');
+                    return;
+                  }
+                }
+                
                 if (importStep === 'myTeamHome') {
                   const parsed = parseHomePage(importText);
                   setMyTeamData(prev => ({ ...prev, ...parsed }));
