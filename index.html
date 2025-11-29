@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Legacy Line Charts v10.2</title>
+    <title>Legacy Line Charts v10.3</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -131,6 +131,7 @@
             stats: { ppPct: 0, pkPct: 0, gpg: 0, gapg: 0 },
             roster: [],
             nextGame: { gameNum: '', opponent: '', date: '', location: '', oppRecord: '', oppSection: '', oppConference: '' },
+            currentGame: { gameNum: '', opponent: '', date: '', time: '', location: '', isHome: false },
             headCoach: { name: '', careerRecord: { w: 0, l: 0, t: 0 }, seasonRecord: { w: 0, l: 0, t: 0 } },
             assistantCoaches: [],
             studentManager: '',
@@ -342,7 +343,7 @@
             const exportObj = {
               _exportInfo: {
                 exportDate: new Date().toISOString(),
-                version: '10.2',
+                version: '10.3',
                 teamName: myTeamSetup.teamName
               },
               myTeamSetup: myTeamSetup
@@ -844,6 +845,16 @@
               
               console.log('📅 Found', scheduledGames.length, 'scheduled games');
               
+              // Capture the CURRENT game (first scheduled) - this is the game we're scouting for
+              let currentGame = null;
+              if (scheduledGames.length >= 1) {
+                currentGame = {
+                  ...scheduledGames[0],
+                  gameNum: (record.w + record.l + record.t + 1).toString()
+                };
+                console.log('✓ Current game being scouted:', currentGame);
+              }
+              
               // Use the THIRD game to skip duplicate (Game 3)
               if (scheduledGames.length >= 3) {
                 nextGame = {
@@ -926,13 +937,13 @@
               
               console.log('📋 ========== PARSE COMPLETE ==========');
               
-              return { teamName, nickname, record, section, conference, headCoach, assistantCoaches, studentManager, stats, lastGame, nextGame };
+              return { teamName, nickname, record, section, conference, headCoach, assistantCoaches, studentManager, stats, lastGame, nextGame, currentGame };
             } catch (error) {
               console.error('Error parsing home page:', error);
               return { 
                 teamName: '', nickname: '', record: { w: 0, l: 0, t: 0 }, 
                 section: '', conference: '', headCoach: { name: '', careerRecord: { w: 0, l: 0, t: 0 }, seasonRecord: { w: 0, l: 0, t: 0 } }, 
-                assistantCoaches: [], stats: { ppPct: 0, pkPct: 0, gpg: 0, gapg: 0 }, lastGame: null, nextGame: null 
+                assistantCoaches: [], stats: { ppPct: 0, pkPct: 0, gpg: 0, gapg: 0 }, lastGame: null, nextGame: null, currentGame: null 
               };
             }
           };
@@ -2818,10 +2829,10 @@
                       </div>
                       
                       <div style={{ fontSize: 'clamp(11px, 1.4vw, 15px)', fontWeight: '800', marginTop: '2px' }} className="text-gray-600">Game #{(myTeamData.record.w + myTeamData.record.l + myTeamData.record.t + 1)}</div>
-                      {myTeamData.nextGame && myTeamData.nextGame.date && (
+                      {myTeamData.currentGame && myTeamData.currentGame.date && (
                         <div style={{ fontSize: 'clamp(7px, 0.8vw, 9px)' }} className="text-gray-700">
-                          {myTeamData.nextGame.date}{myTeamData.nextGame.time ? ` @ ${myTeamData.nextGame.time}` : ''}
-                          {myTeamData.nextGame.location ? ` at ${myTeamData.nextGame.location}` : ''}
+                          {myTeamData.currentGame.date}{myTeamData.currentGame.time ? ` @ ${myTeamData.currentGame.time}` : ''}
+                          {myTeamData.currentGame.location ? ` at ${myTeamData.currentGame.location}` : ''}
                         </div>
                       )}
                     </div>
