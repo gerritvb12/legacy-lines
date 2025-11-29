@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Legacy Line Charts v10.1</title>
+    <title>Legacy Line Charts v10.2</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -342,7 +342,7 @@
             const exportObj = {
               _exportInfo: {
                 exportDate: new Date().toISOString(),
-                version: '10.1',
+                version: '10.2',
                 teamName: myTeamSetup.teamName
               },
               myTeamSetup: myTeamSetup
@@ -600,19 +600,25 @@
                 let coachNameFound = false;
                 for (let i = coachIdx + 1; i < coachIdx + 10 && i < lines.length; i++) {
                   const line = lines[i];
+                  
+                  // First, look for "overall" record pattern (e.g., "19th overall, 222-229-18")
+                  const overallMatch = line.match(/(\d+)(?:st|nd|rd|th)?\s+overall[,\s]+(\d+)-(\d+)-(\d+)/i);
+                  // Fallback to regular year/season record pattern
                   const careerMatch = line.match(/(\d+)(?:st|nd|rd|th)?\s+(?:season|year)[,\s]+(\d+)-(\d+)-(\d+)/i);
                   
-                  if (careerMatch) {
+                  if (overallMatch || careerMatch) {
                     if (!coachNameFound && i > coachIdx + 1) {
                       headCoach.name = lines[i - 1];
                       coachNameFound = true;
                     }
+                    // Prefer overall record if available, otherwise use career/year record
+                    const matchToUse = overallMatch || careerMatch;
                     headCoach.careerRecord = { 
-                      w: parseInt(careerMatch[2]), 
-                      l: parseInt(careerMatch[3]), 
-                      t: parseInt(careerMatch[4]) 
+                      w: parseInt(matchToUse[2]), 
+                      l: parseInt(matchToUse[3]), 
+                      t: parseInt(matchToUse[4]) 
                     };
-                    console.log('✅ Found head coach:', headCoach.name, 'with career record:', headCoach.careerRecord);
+                    console.log('✅ Found head coach:', headCoach.name, 'with career record:', headCoach.careerRecord, overallMatch ? '(using overall)' : '(using year)');
                     break;
                   } else if (line.includes('1st Year') || line.includes('1st year') || line.match(/^1st\s+(?:season|year)/i)) {
                     if (!coachNameFound && i > coachIdx + 1) {
@@ -821,8 +827,10 @@
                         const nextLine = lines[j+1];
                         if (nextLine && nextLine.includes(teamName)) {
                           isHome = true;  // Our team listed second = HOME game = "vs"
+                          location = teamName;  // Home team is the location
                         } else {
                           isHome = false; // Our team listed first = AWAY game = "at"
+                          location = opponent;  // Opponent is home, so they are the location
                         }
                       }
                     }
@@ -2800,7 +2808,7 @@
                         ({myTeamData.record.w}-{myTeamData.record.l}-{myTeamData.record.t}, {myTeamData.section}, {myTeamData.conference})
                       </div>
                       
-                      <div style={{ fontSize: 'clamp(10px, 1.3vw, 14px)', padding: '4px 0' }} className="font-semibold text-gray-600">VS</div>
+                      <div style={{ fontSize: 'clamp(10px, 1.3vw, 14px)', padding: '1px 0' }} className="font-semibold text-gray-600">vs</div>
                       
                       <div style={{ fontSize: 'clamp(14px, 1.8vw, 20px)', color: opponentColors.primary }} className="font-black leading-tight">
                         {opponentData.teamName} {opponentData.nickname}
@@ -2809,7 +2817,13 @@
                         ({opponentData.record.w}-{opponentData.record.l}-{opponentData.record.t}, {opponentData.section}, {opponentData.conference})
                       </div>
                       
-                      <div style={{ fontSize: 'clamp(11px, 1.4vw, 15px)', fontWeight: '800', marginTop: '4px' }} className="text-gray-600">Game #{(myTeamData.record.w + myTeamData.record.l + myTeamData.record.t + 1)}</div>
+                      <div style={{ fontSize: 'clamp(11px, 1.4vw, 15px)', fontWeight: '800', marginTop: '2px' }} className="text-gray-600">Game #{(myTeamData.record.w + myTeamData.record.l + myTeamData.record.t + 1)}</div>
+                      {myTeamData.nextGame && myTeamData.nextGame.date && (
+                        <div style={{ fontSize: 'clamp(7px, 0.8vw, 9px)' }} className="text-gray-700">
+                          {myTeamData.nextGame.date}{myTeamData.nextGame.time ? ` @ ${myTeamData.nextGame.time}` : ''}
+                          {myTeamData.nextGame.location ? ` at ${myTeamData.nextGame.location}` : ''}
+                        </div>
+                      )}
                     </div>
                   </div>
 
