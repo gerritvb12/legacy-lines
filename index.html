@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Legacy Line Charts v10.4</title>
+    <title>Legacy Line Charts v10.5</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -107,20 +107,48 @@
             </svg>
         );
 
+        // ============================================================
+        // SUBSCRIBER CONFIGURATION
+        // Set SUBSCRIBER_MODE = true when building subscriber sites
+        // Then populate EMBEDDED_CONFIG with their exported data
+        // ============================================================
+        const SUBSCRIBER_MODE = false;  // Master site = false, Subscriber sites = true
+        
+        const EMBEDDED_CONFIG = null;   // null for master site, or paste exported config for subscribers
+        /* Example for subscriber site:
+        const EMBEDDED_CONFIG = {
+          siteId: 'east-grand-forks',
+          teamSetup: { teamName: '...', logo: '...', colors: {...}, arena: '...', pronunciations: {...} },
+          careerStats: { LASTNAME_FIR: { type: 'skater', data: {...} }, ... },
+          careerSeasonData: { season1: '...', season2: '...', season3: '...' }
+        };
+        */
+        // ============================================================
+
         const HockeyLinesChart = () => {
-          const [myTeamSetup, setMyTeamSetup] = useState({
-            teamName: 'Delano Tigers',
-            logo: null,
-            colors: { primary: '#fb923c', secondary: '#1f2937' },
-            arena: 'Delano Area Sports Arena, Delano',
-            careerStats: {},
-            pronunciations: {},
-            careerSeasonData: {
-              season1: '',
-              season2: '',
-              season3: ''
+          // Initialize myTeamSetup from EMBEDDED_CONFIG if in subscriber mode
+          const getInitialTeamSetup = () => {
+            if (SUBSCRIBER_MODE && EMBEDDED_CONFIG?.teamSetup) {
+              console.log('🏒 SUBSCRIBER MODE: Loading embedded team config');
+              return EMBEDDED_CONFIG.teamSetup;
             }
-          });
+            // Default for master site (Delano)
+            return {
+              teamName: 'Delano Tigers',
+              logo: null,
+              colors: { primary: '#fb923c', secondary: '#1f2937' },
+              arena: 'Delano Area Sports Arena, Delano',
+              careerStats: {},
+              pronunciations: {},
+              careerSeasonData: {
+                season1: '',
+                season2: '',
+                season3: ''
+              }
+            };
+          };
+          
+          const [myTeamSetup, setMyTeamSetup] = useState(getInitialTeamSetup);
 
           const [myTeamData, setMyTeamData] = useState({
             teamName: '',
@@ -190,10 +218,19 @@
           const [selectedPlayer, setSelectedPlayer] = useState(null);
           const [opponentLogo, setOpponentLogo] = useState(null);
           const [opponentColors, setOpponentColors] = useState({ primary: '#dc2626', secondary: '#991b1b' });
-          const [careerStatsImport, setCareerStatsImport] = useState({
-            lastSeason: '',
-            twoSeasonsAgo: '',
-            threeSeasonsAgo: ''
+          const [careerStatsImport, setCareerStatsImport] = useState(() => {
+            if (SUBSCRIBER_MODE && EMBEDDED_CONFIG?.careerSeasonData) {
+              return {
+                lastSeason: EMBEDDED_CONFIG.careerSeasonData.season1 || '',
+                twoSeasonsAgo: EMBEDDED_CONFIG.careerSeasonData.season2 || '',
+                threeSeasonsAgo: EMBEDDED_CONFIG.careerSeasonData.season3 || ''
+              };
+            }
+            return {
+              lastSeason: '',
+              twoSeasonsAgo: '',
+              threeSeasonsAgo: ''
+            };
           });
 
           const colorOptions = ['GREEN', 'RED', 'BLUE', 'YELLOW', 'WHITE', 'BLACK', 'DARK GRAY', 'LIGHT GRAY'];
@@ -290,6 +327,21 @@
 
           // Load saved setup on mount
           useEffect(() => {
+            // In subscriber mode, initialize from embedded config
+            if (SUBSCRIBER_MODE && EMBEDDED_CONFIG) {
+              console.log('🏒 SUBSCRIBER MODE: Initializing from embedded config');
+              
+              // Initialize career stats in localStorage from embedded config
+              if (EMBEDDED_CONFIG.careerStats && Object.keys(EMBEDDED_CONFIG.careerStats).length > 0) {
+                localStorage.setItem('hockey-scout-career-stats', JSON.stringify(EMBEDDED_CONFIG.careerStats));
+                console.log('📦 Loaded', Object.keys(EMBEDDED_CONFIG.careerStats).length, 'embedded career stat records');
+              }
+              
+              // Don't override myTeamSetup from localStorage in subscriber mode
+              return;
+            }
+            
+            // Master site: load from localStorage
             try {
               const saved = localStorage.getItem('myTeamSetup');
               if (saved) {
@@ -340,13 +392,36 @@
 
           // Export Team Configuration for subscriber builds
           const handleExportConfig = () => {
+            // Get career stats from localStorage
+            let storedCareerStats = {};
+            try {
+              const stored = localStorage.getItem('hockey-scout-career-stats');
+              if (stored) {
+                storedCareerStats = JSON.parse(stored);
+                console.log('📦 Export: Including', Object.keys(storedCareerStats).length, 'career stat records');
+              }
+            } catch (e) {
+              console.error('Error reading career stats:', e);
+            }
+            
             const exportObj = {
               _exportInfo: {
                 exportDate: new Date().toISOString(),
-                version: '10.4',
-                teamName: myTeamSetup.teamName
+                version: '10.5',
+                teamName: myTeamSetup.teamName,
+                description: 'Full team configuration for subscriber site build'
               },
-              myTeamSetup: myTeamSetup
+              myTeamSetup: {
+                ...myTeamSetup,
+                // Include career stats from localStorage
+                careerStats: storedCareerStats
+              },
+              // Include raw career season paste data
+              careerSeasonData: {
+                season1: careerStatsImport.lastSeason || '',
+                season2: careerStatsImport.twoSeasonsAgo || '',
+                season3: careerStatsImport.threeSeasonsAgo || ''
+              }
             };
             
             const jsonString = JSON.stringify(exportObj, null, 2);
@@ -578,6 +653,14 @@
               if (nicknameIdx >= 0) {
                 nickname = lines[nicknameIdx].split(':')[1]?.trim() || '';
                 console.log('✅ Found nickname:', nickname);
+              }
+              
+              // Find Home Arena (for My Team Setup)
+              let homeArena = '';
+              const homeArenaIdx = lines.findIndex(l => l.startsWith('Home Arena:'));
+              if (homeArenaIdx >= 0) {
+                homeArena = lines[homeArenaIdx].split('Home Arena:')[1]?.trim() || '';
+                console.log('✅ Found Home Arena:', homeArena);
               }
               
               // Find team record
@@ -937,7 +1020,7 @@
               
               console.log('📋 ========== PARSE COMPLETE ==========');
               
-              return { teamName, nickname, record, section, conference, headCoach, assistantCoaches, studentManager, stats, lastGame, nextGame, currentGame };
+              return { teamName, nickname, record, section, conference, headCoach, assistantCoaches, studentManager, stats, lastGame, nextGame, currentGame, homeArena };
             } catch (error) {
               console.error('Error parsing home page:', error);
               return { 
@@ -1545,6 +1628,10 @@
               if (importStep === 'myTeamHome') {
                 const parsed = parseHomePage(text);
                 setMyTeamData(prev => ({ ...prev, ...parsed }));
+                // If homeArena was found and myTeamSetup.arena is empty, update it
+                if (parsed.homeArena && !myTeamSetup.arena) {
+                  setMyTeamSetup(prev => ({ ...prev, arena: parsed.homeArena }));
+                }
               } else if (importStep === 'myTeamRoster') {
                 console.log('🔧 Importing MY TEAM roster...');
                 let roster = parseRoster(text, myTeamData.roster);
@@ -2443,13 +2530,15 @@
                     
                     <div className="p-6">
                       <div className="bg-purple-50 p-4 rounded mb-4">
-                        <h3 className="font-bold mb-2">Subscriber Build Export</h3>
+                        <h3 className="font-bold mb-2">📦 Subscriber Build Export v10.5</h3>
                         <p className="text-sm text-gray-600 mb-2">
                           Copy this JSON configuration and send it to Claude to build a customized subscriber version. 
-                          This includes all your team setup data (team name, colors, logo, career stats, pronunciations).
+                        </p>
+                        <p className="text-sm text-gray-600 mb-2">
+                          <strong>🔒 Baked into subscriber site (buttons hidden):</strong> Team name, logo, colors, arena, career stats from all 3 seasons.
                         </p>
                         <p className="text-sm text-gray-600">
-                          <strong>What's included:</strong> Team name, mascot, arena, logo, colors, career stats, pronunciations, and season data.
+                          <strong>✏️ Editable by subscriber coach:</strong> Pronunciations (saved to their local storage).
                         </p>
                       </div>
                       
@@ -2685,12 +2774,16 @@
                     <h1 className="text-xl font-bold">Legacy Line Charts</h1>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => setShowSetup(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
-                      <Settings size={16} /> My Team Setup
-                    </button>
-                    <button onClick={() => setShowCareerStats(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
-                      <Settings size={16} /> My Team Career Stats
-                    </button>
+                    {!SUBSCRIBER_MODE && (
+                      <button onClick={() => setShowSetup(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
+                        <Settings size={16} /> My Team Setup
+                      </button>
+                    )}
+                    {!SUBSCRIBER_MODE && (
+                      <button onClick={() => setShowCareerStats(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
+                        <Settings size={16} /> My Team Career Stats
+                      </button>
+                    )}
                     <button onClick={() => setShowImport(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
                       <Upload size={16} /> Import Next Game Data
                     </button>
@@ -2700,9 +2793,11 @@
                     <button onClick={() => setShowPronunciations(true)} className="bg-white text-blue-900 px-3 py-1.5 rounded hover:bg-gray-100 flex items-center gap-1 text-sm font-semibold">
                       <Settings size={16} /> My Team Pronunciations
                     </button>
-                    <button onClick={handleExportConfig} className="bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700 flex items-center gap-1 text-sm font-semibold">
-                      <Download size={16} /> Export Config
-                    </button>
+                    {!SUBSCRIBER_MODE && (
+                      <button onClick={handleExportConfig} className="bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700 flex items-center gap-1 text-sm font-semibold">
+                        <Download size={16} /> Export Config
+                      </button>
+                    )}
                     <button onClick={() => window.print()} className="bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 flex items-center gap-1 text-sm font-semibold">
                       <Printer size={16} /> Print
                     </button>
