@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Legacy Line Charts v11.0</title>
+    <title>Legacy Line Charts v11.2</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -2203,8 +2203,7 @@
                         overflow: 'hidden'
                       }}>
                         <span>25-26: GP {stats.gp}</span>
-                        <span>-</span>
-                        <span>Pts {stats.g}-{stats.a}--{stats.pts}</span>
+                        <span>Pts. {stats.g}-{stats.a}--{stats.pts}</span>
                       </div>
                       
                       <div style={{ 
@@ -2217,9 +2216,7 @@
                         overflow: 'hidden'
                       }}>
                         <span>PIM {stats.pim}</span>
-                        <span>-</span>
                         <span>+/- {formatPlusMinus(stats.plusMinus)}</span>
-                        <span>-</span>
                         <span>Faceoff {faceoffPct}%</span>
                       </div>
                       
@@ -2233,8 +2230,7 @@
                         overflow: 'hidden'
                       }}>
                         <span>Career: GP {careerStats.gp}</span>
-                        <span>-</span>
-                        <span>Pts {careerStats.g}-{careerStats.a}--{careerStats.pts}</span>
+                        <span>Pts. {careerStats.g}-{careerStats.a}--{careerStats.pts}</span>
                       </div>
                       
                       <div style={{ 
@@ -2247,9 +2243,7 @@
                         overflow: 'hidden'
                       }}>
                         <span>PIM {careerStats.pim || 0}</span>
-                        <span>-</span>
                         <span>+/- {formatPlusMinus(careerStats.plusMinus)}</span>
-                        <span>-</span>
                         <span>Faceoff {careerStats.faceoffPct}%</span>
                       </div>
                     </>
@@ -2265,7 +2259,6 @@
                         overflow: 'hidden'
                       }}>
                         <span>25-26: MIN {goalieStats.min}</span>
-                        <span>-</span>
                         <span>GAA {goalieStats.gaa.toFixed(2)}</span>
                       </div>
                       
@@ -2279,9 +2272,7 @@
                         overflow: 'hidden'
                       }}>
                         <span>PIM {goalieStats.pim || 0}</span>
-                        <span>-</span>
-                        <span>{goalieStats.w}-{goalieStats.l}-{goalieStats.t} ({goalieStats.so})</span>
-                        <span>-</span>
+                        <span>Rec. {goalieStats.w}-{goalieStats.l}-{goalieStats.t} ({goalieStats.so})</span>
                         <span>S% {goalieStats.svp}</span>
                       </div>
                       
@@ -2295,7 +2286,6 @@
                         overflow: 'hidden'
                       }}>
                         <span>Career: MIN {careerGoalieStats.min}</span>
-                        <span>-</span>
                         <span>GAA {careerGoalieStats.gaa.toFixed(2)}</span>
                       </div>
                       
@@ -2309,9 +2299,7 @@
                         overflow: 'hidden'
                       }}>
                         <span>PIM {careerGoalieStats.pim || 0}</span>
-                        <span>-</span>
-                        <span>{careerGoalieStats.w}-{careerGoalieStats.l}-{careerGoalieStats.t} ({careerGoalieStats.so})</span>
-                        <span>-</span>
+                        <span>Rec. {careerGoalieStats.w}-{careerGoalieStats.l}-{careerGoalieStats.t} ({careerGoalieStats.so})</span>
                         <span>S% {careerGoalieStats.svp}</span>
                       </div>
                     </>
