@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Legacy Line Charts v10.5</title>
+    <title>Legacy Line Charts v11.0</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -1062,6 +1062,29 @@
                     
                     let handed = '';
                     let shoots = '';
+                    let height = '';
+                    let weight = '';
+                    
+                    // Extract height (format like 6' 3" or 5' 10")
+                    for (let j = 4; j < fields.length; j++) {
+                      const field = fields[j];
+                      const heightMatch = field.match(/^(\d)'[\s]*(\d{1,2})"?$/);
+                      if (heightMatch) {
+                        height = `${heightMatch[1]}' ${heightMatch[2]}"`;
+                        console.log(`  → Found height: ${height} for ${name}`);
+                        break;
+                      }
+                    }
+                    
+                    // Extract weight (3-digit number typically between 100-250)
+                    for (let j = 4; j < fields.length; j++) {
+                      const field = fields[j];
+                      if (/^\d{2,3}$/.test(field) && parseInt(field) >= 100 && parseInt(field) <= 300) {
+                        weight = field;
+                        console.log(`  → Found weight: ${weight} for ${name}`);
+                        break;
+                      }
+                    }
                     
                     // FIX 2: Extract shoots/handed from correct column
                     for (let j = 5; j < fields.length; j++) {
@@ -1110,6 +1133,8 @@
                       lastName: lastName,
                       position: position,
                       grade: grade,
+                      height: height,
+                      weight: weight,
                       dobYear: dobYear,
                       handed: handed,
                       shoots: shoots,
@@ -1136,6 +1161,20 @@
                     
                     // Extract the part AFTER grade number
                     const afterGrade = line.substring(line.indexOf(grade) + grade.length);
+                    
+                    // Extract height (format like 6' 3" or 5' 10")
+                    let height = '';
+                    const heightMatch = afterGrade.match(/(\d)'[\s]*(\d{1,2})"/);
+                    if (heightMatch) {
+                      height = `${heightMatch[1]}' ${heightMatch[2]}"`;
+                    }
+                    
+                    // Extract weight (3-digit number)
+                    let weight = '';
+                    const weightMatch = afterGrade.match(/(\d{3})(?=\D|$)/);
+                    if (weightMatch && parseInt(weightMatch[1]) >= 100 && parseInt(weightMatch[1]) <= 300) {
+                      weight = weightMatch[1];
+                    }
                     
                     // Extract shoots/handed from the position AFTER weight (3 digits)
                     // Pattern: HEIGHT(like 6' 3") + WEIGHT(like 190) + SHOOTS(LC/RC/Left/Right)
@@ -1171,7 +1210,7 @@
                       dobYear = yearMatch[0];
                     }
                     
-                    console.log('✓ Found player (concatenated):', { number, name, position, grade, shoots, dobYear });
+                    console.log('✓ Found player (concatenated):', { number, name, position, grade, height, weight, shoots, dobYear });
                     
                     // Strip (Capt.) or (Capt) or * from names
                     const cleanName = name.replace(/\s*\(Capt\.?\)/i, '').replace(/\*/g, '').trim();
@@ -1193,6 +1232,8 @@
                       lastName: lastName,
                       position: position,
                       grade: grade,
+                      height: height,
+                      weight: weight,
                       dobYear: dobYear,
                       handed: handed,
                       shoots: shoots,
@@ -1269,7 +1310,7 @@
                     
                     player.stats = currentStats;
                     
-                    const baseCareer = player.baseCareerStats || { gp: 0, g: 0, a: 0, pts: 0, plusMinus: 0, fow: 0, fol: 0 };
+                    const baseCareer = player.baseCareerStats || { gp: 0, g: 0, a: 0, pts: 0, pim: 0, plusMinus: 0, fow: 0, fol: 0 };
                     const totalFOW = (baseCareer.fow || 0) + currentStats.fow;
                     const totalFOL = (baseCareer.fol || 0) + currentStats.fol;
                     const careerFaceoffPct = (totalFOW + totalFOL > 0) ? ((totalFOW / (totalFOW + totalFOL)) * 100).toFixed(1) : '0.0';
@@ -1279,6 +1320,7 @@
                       g: baseCareer.g + currentStats.g,
                       a: baseCareer.a + currentStats.a,
                       pts: baseCareer.pts + currentStats.pts,
+                      pim: (baseCareer.pim || 0) + currentStats.pim,
                       plusMinus: baseCareer.plusMinus + currentStats.plusMinus,
                       faceoffPct: careerFaceoffPct,
                       fow: totalFOW,
@@ -2010,7 +2052,7 @@
             const statFontSize = `${8 * fontScale}pt`;
             const nameFontSize = `${22 * fontScale}pt`;
             const infoFontSize = statFontSize;
-            const pronunciationFontSize = `${10 * fontScale}pt`;
+            const pronunciationFontSize = `${12.5 * fontScale}pt`;
             
             React.useEffect(() => {
               const resizeText = (element, maxSize, minSize = 8) => {
@@ -2041,8 +2083,8 @@
               }
               
               if (pronunciationRef.current && pronunciation) {
-                const maxPronunciationSize = isPreview ? 10 * 0.3125 : 10;
-                const minPronunciationSize = isPreview ? 2 : 6;
+                const maxPronunciationSize = isPreview ? 12.5 * 0.3125 : 12.5;
+                const minPronunciationSize = isPreview ? 2.5 : 7.5;
                 resizeText(pronunciationRef.current, maxPronunciationSize, minPronunciationSize);
               }
             }, [player.number, player.name, pronunciation, isGoalie, isPreview]);
@@ -2080,7 +2122,7 @@
                       textAlign: 'center',
                       width: '100%',
                       overflow: 'hidden',
-                      marginBottom: '4px'
+                      marginBottom: '2px'
                     }}
                   >
                     {player.number}
@@ -2092,9 +2134,10 @@
                       style={{ 
                         fontSize: pronunciationFontSize,
                         fontStyle: 'italic',
+                        fontWeight: 'normal',
                         lineHeight: '1',
                         textAlign: 'center',
-                        marginTop: '1px',
+                        marginTop: '0px',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         width: '100%'
@@ -2135,88 +2178,141 @@
                     lineHeight: '1.0',
                     marginBottom: '1px'
                   }}>
-                    <div style={{ textAlign: 'left' }}>{positionText}</div>
-                    <div style={{ textAlign: 'right' }}>{gradeDisplay}</div>
+                    {/* Build info parts array, only include non-empty values */}
+                    {(() => {
+                      const parts = [];
+                      if (positionText) parts.push(positionText);
+                      if (player.height) parts.push(player.height);
+                      if (player.weight) parts.push(`${player.weight} lbs`);
+                      if (gradeDisplay) parts.push(gradeDisplay);
+                      return parts.map((part, i) => (
+                        <span key={i} style={{ whiteSpace: 'nowrap' }}>{part}</span>
+                      ));
+                    })()}
                   </div>
                   
                   {!isGoalie ? (
                     <>
                       <div style={{ 
+                        display: 'flex',
+                        justifyContent: 'space-between',
                         fontSize: statFontSize,
                         fontWeight: 'bold',
                         lineHeight: '1.0',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden'
                       }}>
-                        25-26: GP:{stats.gp}  {stats.g}-{stats.a}--{stats.pts}
+                        <span>25-26: GP {stats.gp}</span>
+                        <span>-</span>
+                        <span>Pts {stats.g}-{stats.a}--{stats.pts}</span>
                       </div>
                       
                       <div style={{ 
+                        display: 'flex',
+                        justifyContent: 'space-between',
                         fontSize: statFontSize,
                         fontWeight: 'bold',
                         lineHeight: '1.0',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden'
                       }}>
-                        PIM: {stats.pim} +/- {formatPlusMinus(stats.plusMinus)} Faceoff {faceoffPct}%
+                        <span>PIM {stats.pim}</span>
+                        <span>-</span>
+                        <span>+/- {formatPlusMinus(stats.plusMinus)}</span>
+                        <span>-</span>
+                        <span>Faceoff {faceoffPct}%</span>
                       </div>
                       
                       <div style={{ 
+                        display: 'flex',
+                        justifyContent: 'space-between',
                         fontSize: statFontSize,
+                        fontWeight: 'normal',
                         lineHeight: '1.0',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden'
                       }}>
-                        Career GP:{careerStats.gp}  {careerStats.g}-{careerStats.a}--{careerStats.pts}
+                        <span>Career: GP {careerStats.gp}</span>
+                        <span>-</span>
+                        <span>Pts {careerStats.g}-{careerStats.a}--{careerStats.pts}</span>
                       </div>
                       
                       <div style={{ 
+                        display: 'flex',
+                        justifyContent: 'space-between',
                         fontSize: statFontSize,
+                        fontWeight: 'normal',
                         lineHeight: '1.0',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden'
                       }}>
-                        PIM: {careerStats.pim || 0} +/- {formatPlusMinus(careerStats.plusMinus)} Faceoff {careerStats.faceoffPct}%
+                        <span>PIM {careerStats.pim || 0}</span>
+                        <span>-</span>
+                        <span>+/- {formatPlusMinus(careerStats.plusMinus)}</span>
+                        <span>-</span>
+                        <span>Faceoff {careerStats.faceoffPct}%</span>
                       </div>
                     </>
                   ) : (
                     <>
                       <div style={{ 
+                        display: 'flex',
+                        justifyContent: 'space-between',
                         fontSize: statFontSize,
                         fontWeight: 'bold',
                         lineHeight: '1.0',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden'
                       }}>
-                        25-26: MIN {goalieStats.min} GAA: {goalieStats.gaa.toFixed(2)}
+                        <span>25-26: MIN {goalieStats.min}</span>
+                        <span>-</span>
+                        <span>GAA {goalieStats.gaa.toFixed(2)}</span>
                       </div>
                       
                       <div style={{ 
+                        display: 'flex',
+                        justifyContent: 'space-between',
                         fontSize: statFontSize,
                         fontWeight: 'bold',
                         lineHeight: '1.0',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden'
                       }}>
-                        PIM: {goalieStats.pim || 0} {goalieStats.w}-{goalieStats.l}-{goalieStats.t} ({goalieStats.so}) S% {goalieStats.svp}
+                        <span>PIM {goalieStats.pim || 0}</span>
+                        <span>-</span>
+                        <span>{goalieStats.w}-{goalieStats.l}-{goalieStats.t} ({goalieStats.so})</span>
+                        <span>-</span>
+                        <span>S% {goalieStats.svp}</span>
                       </div>
                       
                       <div style={{ 
+                        display: 'flex',
+                        justifyContent: 'space-between',
                         fontSize: statFontSize,
+                        fontWeight: 'normal',
                         lineHeight: '1.0',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden'
                       }}>
-                        Career: MIN {careerGoalieStats.min} GAA: {careerGoalieStats.gaa.toFixed(2)}
+                        <span>Career: MIN {careerGoalieStats.min}</span>
+                        <span>-</span>
+                        <span>GAA {careerGoalieStats.gaa.toFixed(2)}</span>
                       </div>
                       
                       <div style={{ 
+                        display: 'flex',
+                        justifyContent: 'space-between',
                         fontSize: statFontSize,
+                        fontWeight: 'normal',
                         lineHeight: '1.0',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden'
                       }}>
-                        PIM: {careerGoalieStats.pim || 0} {careerGoalieStats.w}-{careerGoalieStats.l}-{careerGoalieStats.t} ({careerGoalieStats.so}) S% {careerGoalieStats.svp}
+                        <span>PIM {careerGoalieStats.pim || 0}</span>
+                        <span>-</span>
+                        <span>{careerGoalieStats.w}-{careerGoalieStats.l}-{careerGoalieStats.t} ({careerGoalieStats.so})</span>
+                        <span>-</span>
+                        <span>S% {careerGoalieStats.svp}</span>
                       </div>
                     </>
                   )}
@@ -3113,17 +3209,17 @@
                       <div className="border-2 rounded flex flex-col" style={{ 
                         borderColor: myTeamSetup.colors.primary, 
                         background: `${myTeamSetup.colors.primary}10`,
-                        padding: '3px'
+                        padding: '2px'
                       }}>
-                        <div style={{ fontSize: '9px' }} className="font-bold text-center mb-0">{myTeamData.nickname} Penalty Kill</div>
-                        <div className="flex-1 flex flex-col justify-around" style={{ fontSize: '9px', lineHeight: '1.1' }}>
+                        <div style={{ fontSize: '8px' }} className="font-bold text-center mb-0">{myTeamData.nickname} Penalty Kill</div>
+                        <div className="flex-1 flex flex-col justify-around" style={{ fontSize: '11px', lineHeight: '1.0' }}>
                           {[0,1,2,3,4].map(i => (
                             <input 
                               key={i}
                               type="text" 
                               placeholder="" 
-                              className="w-full border-0 bg-transparent"
-                              style={{ fontSize: '9px', padding: '1px', outline: 'none' }}
+                              className="w-full border-0 bg-transparent text-center font-bold"
+                              style={{ fontSize: '11px', padding: '0px', outline: 'none' }}
                               value={coachNotes.pk?.split('\n')[i] || ''}
                               onChange={(e) => {
                                 const lines = coachNotes.pk?.split('\n') || ['','','','',''];
@@ -3138,17 +3234,17 @@
                       <div className="border-2 rounded flex flex-col" style={{ 
                         borderColor: myTeamSetup.colors.primary, 
                         background: `${myTeamSetup.colors.primary}10`,
-                        padding: '3px'
+                        padding: '2px'
                       }}>
-                        <div style={{ fontSize: '9px' }} className="font-bold text-center mb-0">{myTeamData.nickname} Power Play</div>
-                        <div className="flex-1 flex flex-col justify-around" style={{ fontSize: '9px', lineHeight: '1.1' }}>
+                        <div style={{ fontSize: '8px' }} className="font-bold text-center mb-0">{myTeamData.nickname} Power Play</div>
+                        <div className="flex-1 flex flex-col justify-around" style={{ fontSize: '11px', lineHeight: '1.0' }}>
                           {[0,1,2,3,4].map(i => (
                             <input 
                               key={i}
                               type="text" 
                               placeholder="" 
-                              className="w-full border-0 bg-transparent"
-                              style={{ fontSize: '9px', padding: '1px', outline: 'none' }}
+                              className="w-full border-0 bg-transparent text-center font-bold"
+                              style={{ fontSize: '11px', padding: '0px', outline: 'none' }}
                               value={coachNotes.pp?.split('\n')[i] || ''}
                               onChange={(e) => {
                                 const lines = coachNotes.pp?.split('\n') || ['','','','',''];
